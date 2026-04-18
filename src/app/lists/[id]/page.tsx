@@ -1,7 +1,8 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import type { Item } from '@/lib/types';
 import { ItemPicker } from '@/components/ItemPicker';
@@ -16,8 +17,21 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const updateItem = useStore((s) => s.updateItem);
   const removeItem = useStore((s) => s.removeItem);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const shouldAutoOpen = searchParams.get('addItem') === '1';
+  const autoOpenedRef = useRef(false);
+
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (shouldAutoOpen && !autoOpenedRef.current) {
+      autoOpenedRef.current = true;
+      setEditorOpen(true);
+      router.replace(`/lists/${id}`);
+    }
+  }, [shouldAutoOpen, id, router]);
 
   const editing = editingId ? list?.items.find((i) => i.id === editingId) : null;
 
@@ -147,6 +161,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
       <ItemEditor
         open={editorOpen}
         initial={editing ?? undefined}
+        allowAddAnother={!editingId}
         onClose={() => {
           setEditorOpen(false);
           setEditingId(null);

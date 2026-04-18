@@ -7,12 +7,10 @@ import { useStore } from '@/lib/store';
 export default function NewListPage() {
   const router = useRouter();
   const createList = useStore((s) => s.createList);
-  const addItem = useStore((s) => s.addItem);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
-  const [bulkItems, setBulkItems] = useState('');
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -21,20 +19,20 @@ export default function NewListPage() {
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
-    const id = createList({ title: title.trim(), description: description.trim() || undefined, tags });
-    const lines = bulkItems
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    for (const line of lines) {
-      addItem(id, { type: 'text', title: line, tags: [] });
-    }
-    router.push(`/lists/${id}`);
+    const id = createList({
+      title: title.trim(),
+      description: description.trim() || undefined,
+      tags,
+    });
+    router.push(`/lists/${id}?addItem=1`);
   }
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10">
-      <h1 className="text-3xl font-semibold tracking-tight mb-6">New list</h1>
+      <h1 className="text-3xl font-semibold tracking-tight mb-2">New list</h1>
+      <p className="text-sm text-foreground/60 mb-6">
+        Set up the list, then add items one at a time with the editor.
+      </p>
       <form onSubmit={handleSubmit} className="space-y-5">
         <Field label="Title" required>
           <input
@@ -61,18 +59,6 @@ export default function NewListPage() {
             className="input"
           />
         </Field>
-        <Field
-          label="Items (one per line)"
-          hint="Get started quickly with plain-text items. You can add images, URLs, or movies later."
-        >
-          <textarea
-            value={bulkItems}
-            onChange={(e) => setBulkItems(e.target.value)}
-            rows={8}
-            placeholder={`Pepperoni\nMargherita\nHawaiian\nBBQ chicken`}
-            className="input resize-y font-mono text-sm"
-          />
-        </Field>
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
@@ -86,7 +72,7 @@ export default function NewListPage() {
             className="px-4 py-2 text-sm rounded-md bg-foreground text-background font-medium disabled:opacity-40"
             disabled={!title.trim()}
           >
-            Create list
+            Create &amp; add items
           </button>
         </div>
       </form>

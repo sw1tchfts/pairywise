@@ -8,6 +8,8 @@ type Props = {
   initial?: Partial<Item>;
   onClose: () => void;
   onSave: (item: Omit<Item, 'id'>) => void;
+  /** When true, show a "Save & add another" button (useful for initial list setup). */
+  allowAddAnother?: boolean;
 };
 
 const EMPTY: Omit<Item, 'id'> = {
@@ -21,17 +23,16 @@ const EMPTY: Omit<Item, 'id'> = {
   linkUrl: '',
 };
 
-export function ItemEditor({ open, initial, onClose, onSave }: Props) {
+export function ItemEditor({ open, ...rest }: Props) {
   if (!open) return null;
-  return (
-    <ItemEditorForm initial={initial} onClose={onClose} onSave={onSave} />
-  );
+  return <ItemEditorForm {...rest} />;
 }
 
 function ItemEditorForm({
   initial,
   onClose,
   onSave,
+  allowAddAnother,
 }: Omit<Props, 'open'>) {
   const [draft, setDraft] = useState<Omit<Item, 'id'>>(() => ({
     ...EMPTY,
@@ -53,9 +54,7 @@ function ItemEditorForm({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!draft.title.trim()) return;
+  function commit() {
     const tags = tagsInput
       .split(',')
       .map((t) => t.trim())
@@ -70,6 +69,20 @@ function ItemEditorForm({
       linkUrl: draft.linkUrl?.trim() || undefined,
       tags,
     });
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.title.trim()) return;
+    commit();
+  }
+
+  function handleSaveAndAddAnother() {
+    if (!draft.title.trim()) return;
+    commit();
+    setDraft({ ...EMPTY });
+    setTagsInput('');
+    setTimeout(() => titleRef.current?.focus(), 0);
   }
 
   return (
@@ -169,7 +182,7 @@ function ItemEditorForm({
             </div>
           </fieldset>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 flex-wrap">
             <button
               type="button"
               onClick={onClose}
@@ -177,6 +190,16 @@ function ItemEditorForm({
             >
               Cancel
             </button>
+            {allowAddAnother && (
+              <button
+                type="button"
+                onClick={handleSaveAndAddAnother}
+                className="px-4 py-2 text-sm rounded-md border border-foreground/30 font-medium disabled:opacity-40"
+                disabled={!draft.title.trim()}
+              >
+                Save &amp; add another
+              </button>
+            )}
             <button
               type="submit"
               className="px-4 py-2 text-sm rounded-md bg-foreground text-background font-medium disabled:opacity-40"
