@@ -1,0 +1,148 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import type { Item, RankList } from '@/lib/types';
+import { nextPair, comparisonsRemaining, rankElo } from '@/lib/ranking';
+import { useStore } from '@/lib/store';
+import { VoteCard } from './VoteCard';
+
+type Props = { list: RankList };
+
+export function VoteScreen({ list }: Props) {
+  const recordComparison = useStore((s) => s.recordComparison);
+  const skipPair = useStore((s) => s.skipPair);
+  const undoLastComparison = useStore((s) => s.undoLastComparison);
+
+  const [nonce, setNonce] = useState(0);
+
+  const ratingsById = useMemo(() => {
+    const rs = rankElo(list.items, list.comparisons);
+    return new Map(rs.map((r) => [r.itemId, r.rating]));
+  }, [list.items, list.comparisons]);
+
+  const pair = useMemo(() => {
+    return nextPair(list.items, list.comparisons, {
+      strategy: 'informative',
+      ratingsById,
+    });
+    // include nonce so we re-select after each vote even if it matches
+  }, [list.items, list.comparisons, ratingsById, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const remaining = comparisonsRemaining(list.items, list.comparisons);
+
+  function vote(winner: Item, loser: Item) {
+    recordComparison(list.id, winner.id, loser.id);
+    setNonce((n) => n + 1);
+  }
+
+  function skip() {
+    if (!pair) return;
+    skipPair(list.id, pair[0].id, pair[1].id);
+    setNonce((n) => n + 1);
+  }
+
+  function undo() {
+    undoLastComparison(list.id);
+    setNonce((n) => n + 1);
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!pair) return;
+      if (e.target instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === '1') {
+        e.preventDefault();
+        vote(pair[0], pair[1]);
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === '2') {
+        e.preventDefault();
+        vote(pair[1], pair[0]);
+      } else if (e.key === ' ' || e.key === 's') {
+        e.preventDefault();
+        skip();
+      } else if (e.key === 'u' || (e.metaKey && e.key === 'z')) {
+        e.preventDefault();
+        undo();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pair, list.id]);
+
+  if (list.items.length < 2) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-10 text-center">
+        <p className="text-foreground/70">Add at least 2 items to start voting.</p>
+        <Link
+          href={`/lists/${list.id}`}
+          className="mt-4 inline-block rounded-md bg-foreground text-background px-4 py-2"
+        >
+          Back to list
+        </Link>
+      </div>
+    );
+  }
+
+  if (!pair) {
+    return (
+      <div className="mx-auto max-w-2xl px-6 py-10 text-center">
+        <p className="text-foreground/70">No more pairs available.</p>
+      </div>
+    );
+  }
+
+  const totalDone = list.comparisons.length;
+  const estimatedTotal = totalDone + remaining;
+
+  return (
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Link href={`/lists/${list.id}`} className="text-sm text-foreground/60 hover:text-foreground">
+            ← {list.title}
+          </Link>
+          <h1 className="text-2xl font-semibold mt-1">Which do you prefer?</h1>
+        </div>
+        <div className="text-right text-sm text-foreground/70">
+          <div>
+            <span className="font-mono">{totalDone}</span>
+            {estimatedTotal > totalDone && (
+              <span className="text-foreground/50"> / {estimatedTotal}</span>
+            )}{' '}
+            votes
+          </div>
+          <Link
+            href={`/lists/${list.id}/results`}
+            className="text-xs text-foreground/60 hover:text-foreground hover:underline"
+          >
+            View results →
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <VoteCard item={pair[0]} onSelect={() => vote(pair[0], pair[1])} hotkeyLabel="←" />
+        <VoteCard item={pair[1]} onSelect={() => vote(pair[1], pair[0])} hotkeyLabel="→" />
+      </div>
+
+      <div className="mt-6 flex items-center justify-center gap-4 text-sm">
+        <button
+          type="button"
+          onClick={skip}
+          className="px-4 py-2 rounded-md border border-foreground/20 hover:bg-foreground/5"
+        >
+          Skip <kbd className="ml-1 text-[11px] font-mono opacity-60">Space</kbd>
+        </button>
+        <button
+          type="button"
+          onClick={undo}
+          disabled={list.comparisons.length === 0}
+          className="px-4 py-2 rounded-md border border-foreground/20 hover:bg-foreground/5 disabled:opacity-40"
+        >
+          Undo <kbd className="ml-1 text-[11px] font-mono opacity-60">U</kbd>
+        </button>
+      </div>
+    </div>
+  );
+}
