@@ -7,17 +7,21 @@ export const ItemTypeSchema = z.enum([
   'tmdb',
   'spotify',
   'youtube',
+  'media',
 ]);
 export type ItemType = z.infer<typeof ItemTypeSchema>;
 
 export const ItemSchema = z.object({
   id: z.string(),
-  type: ItemTypeSchema,
-  label: z.string(),
+  type: ItemTypeSchema.default('text'),
+  title: z.string(),
+  description: z.string().optional(),
+  tags: z.array(z.string()).default([]),
   imageUrl: z.string().optional(),
+  audioUrl: z.string().optional(),
+  videoUrl: z.string().optional(),
   linkUrl: z.string().optional(),
   externalId: z.string().optional(),
-  description: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;

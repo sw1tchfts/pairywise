@@ -1,9 +1,11 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
+import type { Item } from '@/lib/types';
 import { ItemPicker } from '@/components/ItemPicker';
+import { ItemEditor } from '@/components/ItemEditor';
 
 type Params = { id: string };
 
@@ -11,7 +13,34 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const { id } = use(params);
   const list = useStore((s) => s.lists[id]);
   const addItem = useStore((s) => s.addItem);
+  const updateItem = useStore((s) => s.updateItem);
   const removeItem = useStore((s) => s.removeItem);
+
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const editing = editingId ? list?.items.find((i) => i.id === editingId) : null;
+
+  function openNew() {
+    setEditingId(null);
+    setEditorOpen(true);
+  }
+
+  function openEdit(item: Item) {
+    setEditingId(item.id);
+    setEditorOpen(true);
+  }
+
+  function handleSave(payload: Omit<Item, 'id'>) {
+    if (!list) return;
+    if (editingId) {
+      updateItem(list.id, editingId, payload);
+    } else {
+      addItem(list.id, payload);
+    }
+    setEditorOpen(false);
+    setEditingId(null);
+  }
 
   if (!list) {
     return (
@@ -60,7 +89,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold mb-3">Add items</h2>
-        <ItemPicker onAdd={(item) => addItem(list.id, item)} />
+        <ItemPicker onAdd={(item) => addItem(list.id, item)} onOpenEditor={openNew} />
       </section>
 
       <section className="mt-8">
@@ -74,38 +103,81 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
                 key={item.id}
                 className="group flex items-center gap-3 rounded-md border border-black/10 dark:border-white/10 p-2"
               >
-                {item.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.imageUrl}
-                    alt=""
-                    className="w-10 h-10 rounded object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded bg-foreground/10 flex items-center justify-center text-xs text-foreground/50">
-                    {item.type.slice(0, 3)}
-                  </div>
-                )}
+                <ItemThumb item={item} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{item.label}</div>
-                  {item.description && (
-                    <div className="text-xs text-foreground/60 truncate">
-                      {item.description}
-                    </div>
-                  )}
+                  <div className="text-sm font-medium truncate">{item.title}</div>
+                  <div className="text-xs text-foreground/60 truncate flex items-center gap-2">
+                    {[
+                      item.imageUrl && 'image',
+                      item.audioUrl && 'audio',
+                      item.videoUrl && 'video',
+                      item.linkUrl && 'link',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || item.description || 'Text only'}
+                    {item.tags.length > 0 && (
+                      <span className="text-foreground/50">
+                        · {item.tags.join(', ')}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => removeItem(list.id, item.id)}
-                  className="text-xs px-2 py-1 rounded text-red-600 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-950/40"
-                >
-                  Remove
-                </button>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(item)}
+                    className="text-xs px-2 py-1 rounded hover:bg-foreground/5"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(list.id, item.id)}
+                    className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <ItemEditor
+        open={editorOpen}
+        initial={editing ?? undefined}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditingId(null);
+        }}
+        onSave={handleSave}
+      />
+    </div>
+  );
+}
+
+function ItemThumb({ item }: { item: Item }) {
+  if (item.imageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={item.imageUrl}
+        alt=""
+        className="w-10 h-10 rounded object-cover flex-shrink-0"
+      />
+    );
+  }
+  const badge = item.videoUrl
+    ? 'vid'
+    : item.audioUrl
+      ? 'aud'
+      : item.linkUrl
+        ? 'url'
+        : item.type.slice(0, 3);
+  return (
+    <div className="w-10 h-10 rounded bg-foreground/10 flex items-center justify-center text-[10px] uppercase text-foreground/60 flex-shrink-0">
+      {badge}
     </div>
   );
 }

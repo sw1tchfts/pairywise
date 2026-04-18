@@ -16,6 +16,7 @@ type Actions = {
   duplicateList: (id: string) => string | null;
   updateList: (id: string, patch: Partial<Pick<RankList, 'title' | 'description' | 'tags' | 'algorithmDefault'>>) => void;
   addItem: (listId: string, item: Omit<Item, 'id'>) => string;
+  updateItem: (listId: string, itemId: string, patch: Partial<Omit<Item, 'id'>>) => void;
   removeItem: (listId: string, itemId: string) => void;
   recordComparison: (listId: string, winnerId: string, loserId: string) => void;
   skipPair: (listId: string, aId: string, bId: string) => void;
@@ -111,6 +112,24 @@ export const useStore = create<State & Actions>()(
         });
         return itemId;
       },
+
+      updateItem: (listId, itemId, patch) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list) return s;
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: {
+                ...list,
+                items: list.items.map((i) =>
+                  i.id === itemId ? { ...i, ...patch } : i,
+                ),
+                updatedAt: Date.now(),
+              },
+            },
+          };
+        }),
 
       removeItem: (listId, itemId) =>
         set((s) => {
@@ -208,7 +227,21 @@ export const useStore = create<State & Actions>()(
     {
       name: 'pairywise-store',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persisted, fromVersion) => {
+        const state = persisted as State | undefined;
+        if (!state || !state.lists) return state ?? { lists: {}, order: [] };
+        if (fromVersion < 2) {
+          // v1 used `label` instead of `title`; copy it forward for backward compat.
+          for (const list of Object.values(state.lists)) {
+            for (const item of list.items as Array<Item & { label?: string }>) {
+              if (!item.title && item.label) item.title = item.label;
+              if (!item.tags) item.tags = [];
+            }
+          }
+        }
+        return state;
+      },
     },
   ),
 );

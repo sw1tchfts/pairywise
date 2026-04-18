@@ -27,7 +27,7 @@ export default function NewListPage() {
       .map((l) => l.trim())
       .filter(Boolean);
     for (const line of lines) {
-      addItem(id, { type: 'text', label: line });
+      addItem(id, { type: 'text', title: line, tags: [] });
     }
     router.push(`/lists/${id}`);
   }

@@ -1,7 +1,7 @@
 import type { Comparison, Item } from '../types';
 
 export function makeItems(labels: string[]): Item[] {
-  return labels.map((label) => ({ id: label, type: 'text', label }));
+  return labels.map((label) => ({ id: label, type: 'text', title: label, tags: [] }));
 }
 
 /**

@@ -49,13 +49,14 @@ export function TmdbSearchInput({ onAdd }: Props) {
     const year = (r.release_date ?? r.first_air_date ?? '').slice(0, 4);
     onAdd({
       type: 'tmdb',
-      label: year ? `${label} (${year})` : label,
+      title: year ? `${label} (${year})` : label,
       description: r.overview,
       imageUrl: r.poster_path
         ? `https://image.tmdb.org/t/p/w300${r.poster_path}`
         : undefined,
       externalId: `${r.media_type}:${r.id}`,
       metadata: { mediaType: r.media_type },
+      tags: [],
     });
   }
 

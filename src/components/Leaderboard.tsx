@@ -35,7 +35,7 @@ export function Leaderboard({ items, rankings, scoreLabel, onItemClick }: Props)
               />
             )}
             <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">{item.label}</div>
+              <div className="font-medium truncate">{item.title}</div>
               <div className="text-xs text-foreground/60">
                 {r.wins}W–{r.losses}L ({r.comparisons} votes) · confidence{' '}
                 {(r.confidence * 100).toFixed(0)}%

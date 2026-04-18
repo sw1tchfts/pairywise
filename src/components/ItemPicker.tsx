@@ -7,20 +7,18 @@ import { TmdbSearchInput } from './TmdbSearchInput';
 
 type Props = {
   onAdd: (item: Omit<Item, 'id'>) => void;
+  onOpenEditor?: () => void;
 };
 
-type Tab = ItemType;
+type Tab = ItemType | 'manual';
 
-export function ItemPicker({ onAdd }: Props) {
-  const [tab, setTab] = useState<Tab>('text');
+export function ItemPicker({ onAdd, onOpenEditor }: Props) {
+  const [tab, setTab] = useState<Tab>('manual');
   const [text, setText] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageLabel, setImageLabel] = useState('');
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'text', label: 'Text' },
-    { key: 'image', label: 'Image' },
-    { key: 'url', label: 'URL' },
+    { key: 'manual', label: 'Quick add' },
+    { key: 'url', label: 'From URL' },
     { key: 'tmdb', label: 'Movie/TV' },
   ];
 
@@ -41,24 +39,32 @@ export function ItemPicker({ onAdd }: Props) {
             {t.label}
           </button>
         ))}
+        {onOpenEditor && (
+          <button
+            type="button"
+            onClick={onOpenEditor}
+            className="ml-auto text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
+          >
+            Detailed editor…
+          </button>
+        )}
       </div>
 
-      {tab === 'text' && (
+      {tab === 'manual' && (
         <form
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (!text.trim()) return;
-            onAdd({ type: 'text', label: text.trim() });
+            onAdd({ type: 'text', title: text.trim(), tags: [] });
             setText('');
           }}
         >
           <input
             className="input flex-1"
-            placeholder="Add a text item…"
+            placeholder="Quick add a title…"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            autoFocus
           />
           <button
             type="submit"
@@ -66,43 +72,6 @@ export function ItemPicker({ onAdd }: Props) {
             disabled={!text.trim()}
           >
             Add
-          </button>
-        </form>
-      )}
-
-      {tab === 'image' && (
-        <form
-          className="grid gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!imageUrl.trim()) return;
-            onAdd({
-              type: 'image',
-              label: imageLabel.trim() || 'Image',
-              imageUrl: imageUrl.trim(),
-            });
-            setImageUrl('');
-            setImageLabel('');
-          }}
-        >
-          <input
-            className="input"
-            placeholder="Image URL (https://…)"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-          />
-          <input
-            className="input"
-            placeholder="Label (optional)"
-            value={imageLabel}
-            onChange={(e) => setImageLabel(e.target.value)}
-          />
-          <button
-            type="submit"
-            className="justify-self-end px-4 py-1.5 rounded-md bg-foreground text-background font-medium text-sm disabled:opacity-40"
-            disabled={!imageUrl.trim()}
-          >
-            Add image
           </button>
         </form>
       )}

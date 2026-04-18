@@ -41,10 +41,11 @@ export function UrlPreviewInput({ onAdd }: Props) {
     if (!preview) return;
     onAdd({
       type: 'url',
-      label: preview.title || preview.url,
+      title: preview.title || preview.url,
       description: preview.description,
       imageUrl: preview.image,
       linkUrl: preview.url,
+      tags: [],
     });
     setPreview(null);
     setUrl('');
