@@ -3,16 +3,18 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getBrowserClient } from '@/lib/supabase/browser';
+import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
 import { useToast } from './Toaster';
 
 export function SessionMenu() {
   const router = useRouter();
   const toast = useToast();
+  const cloud = isCloudEnabled();
   const [email, setEmail] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydrated, setHydrated] = useState(!cloud);
 
   useEffect(() => {
+    if (!cloud) return;
     const supabase = getBrowserClient();
     let mounted = true;
     (async () => {
@@ -28,7 +30,7 @@ export function SessionMenu() {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [cloud]);
 
   async function signOut() {
     const supabase = getBrowserClient();
@@ -37,6 +39,8 @@ export function SessionMenu() {
     router.push('/');
     router.refresh();
   }
+
+  if (!cloud) return null;
 
   if (!hydrated) {
     return <div className="w-16 h-7" aria-hidden />;
