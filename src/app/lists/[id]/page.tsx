@@ -28,6 +28,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [moreModesOpen, setMoreModesOpen] = useState(false);
   const currentUserId = useCurrentUserId();
 
   useEffect(() => {
@@ -93,6 +94,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   }
 
   const canVote = list.items.length >= 2;
+  const ownedByMe = !list.ownerId || list.ownerId === currentUserId;
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
@@ -101,60 +103,84 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
           ← All lists
         </Link>
       </div>
-      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
-        {list.title}
-      </h1>
+      <div className="flex items-center gap-2 flex-wrap">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words min-w-0">
+          {list.title}
+        </h1>
+        {!ownedByMe && (
+          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/70 font-semibold">
+            Shared with you
+          </span>
+        )}
+      </div>
       {list.description && (
         <p className="mt-1 text-foreground/70">{list.description}</p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <Link
-          href={`/lists/${list.id}/vote`}
-          aria-disabled={!canVote}
-          className={`rounded-md px-4 py-2 font-medium text-sm ${
-            canVote
-              ? 'bg-foreground text-background'
-              : 'bg-foreground/20 text-foreground/50 pointer-events-none'
-          }`}
-        >
-          A vs B
-        </Link>
-        <Link
-          href={`/lists/${list.id}/tiers`}
-          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
-        >
-          Tier list
-        </Link>
-        <Link
-          href={`/lists/${list.id}/rate`}
-          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
-        >
-          Rate 1–10
-        </Link>
-        <Link
-          href={`/lists/${list.id}/bracket`}
-          aria-disabled={!canVote}
-          className={`rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 ${
-            canVote ? '' : 'opacity-40 pointer-events-none'
-          }`}
-        >
-          Tournament
-        </Link>
-        <Link
-          href={`/lists/${list.id}/results`}
-          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 ml-auto"
-        >
-          Results
-        </Link>
-        {(!list.ownerId || list.ownerId === currentUserId) && (
+      <div className="mt-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/lists/${list.id}/vote`}
+            aria-disabled={!canVote}
+            className={`rounded-md px-5 py-2.5 font-medium text-sm ${
+              canVote
+                ? 'bg-foreground text-background'
+                : 'bg-foreground/20 text-foreground/50 pointer-events-none'
+            }`}
+          >
+            {canVote ? 'Start voting →' : 'Add 2+ items to vote'}
+          </Link>
           <button
             type="button"
-            onClick={() => setShareOpen(true)}
-            className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
+            onClick={() => setMoreModesOpen((v) => !v)}
+            aria-expanded={moreModesOpen}
+            className="rounded-md px-3 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 flex items-center gap-1"
           >
-            Share
+            More ways to rank
+            <span aria-hidden className={`transition-transform ${moreModesOpen ? 'rotate-180' : ''}`}>
+              ▾
+            </span>
           </button>
+          <Link
+            href={`/lists/${list.id}/results`}
+            className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 ml-auto"
+          >
+            Results
+          </Link>
+          {ownedByMe && (
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
+            >
+              Share
+            </button>
+          )}
+        </div>
+        {moreModesOpen && (
+          <div className="mt-2 flex flex-wrap gap-2 pl-1 text-sm">
+            <Link
+              href={`/lists/${list.id}/tiers`}
+              className="rounded-md px-3 py-1.5 border border-foreground/15 hover:bg-foreground/5 text-foreground/80"
+            >
+              Tier list <span className="text-foreground/40">· S/A/B/C/D</span>
+            </Link>
+            <Link
+              href={`/lists/${list.id}/rate`}
+              className="rounded-md px-3 py-1.5 border border-foreground/15 hover:bg-foreground/5 text-foreground/80"
+            >
+              Rate 1–10 <span className="text-foreground/40">· scores</span>
+            </Link>
+            <Link
+              href={`/lists/${list.id}/bracket`}
+              aria-disabled={!canVote}
+              className={`rounded-md px-3 py-1.5 border border-foreground/15 hover:bg-foreground/5 text-foreground/80 ${
+                canVote ? '' : 'opacity-40 pointer-events-none'
+              }`}
+            >
+              Tournament <span className="text-foreground/40">· bracket</span>
+            </Link>
+          </div>
         )}
       </div>
       <ShareDialog
@@ -162,33 +188,39 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         open={shareOpen}
         onClose={() => setShareOpen(false)}
       />
-      <div className="mt-2 text-sm text-foreground/60">
+      <div className="mt-3 text-sm text-foreground/60">
         {list.items.length} items · {list.comparisons.length} votes
       </div>
 
       <section className="mt-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Items</h2>
-          <button
-            type="button"
-            onClick={openNew}
-            className="rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
-          >
-            + Add item
-          </button>
+          {ownedByMe && (
+            <button
+              type="button"
+              onClick={openNew}
+              className="rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
+            >
+              + Add item
+            </button>
+          )}
         </div>
         {list.items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-black/20 dark:border-white/20 p-8 text-center">
             <p className="text-sm text-foreground/70">
-              No items yet. Add at least two to start voting.
+              {ownedByMe
+                ? 'No items yet. Add at least two to start voting.'
+                : 'This list has no items yet.'}
             </p>
-            <button
-              type="button"
-              onClick={openNew}
-              className="mt-3 rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
-            >
-              + Add your first item
-            </button>
+            {ownedByMe && (
+              <button
+                type="button"
+                onClick={openNew}
+                className="mt-3 rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
+              >
+                + Add your first item
+              </button>
+            )}
           </div>
         ) : (
           <ul className="grid gap-2">
@@ -217,25 +249,27 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(item)}
-                    aria-label={`Edit ${item.title}`}
-                    className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(item)}
-                    aria-label={`Remove ${item.title}`}
-                    className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
-                  >
-                    <span className="sm:hidden" aria-hidden>×</span>
-                    <span className="hidden sm:inline">Remove</span>
-                  </button>
-                </div>
+                {ownedByMe && (
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEdit(item)}
+                      aria-label={`Edit ${item.title}`}
+                      className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(item)}
+                      aria-label={`Remove ${item.title}`}
+                      className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
+                    >
+                      <span className="sm:hidden" aria-hidden>×</span>
+                      <span className="hidden sm:inline">Remove</span>
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

@@ -1,15 +1,24 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { TagInput } from '@/components/TagInput';
 
 export default function NewListPage() {
+  return (
+    <Suspense>
+      <NewListForm />
+    </Suspense>
+  );
+}
+
+function NewListForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createList = useStore((s) => s.createList);
 
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(searchParams.get('title') ?? '');
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
