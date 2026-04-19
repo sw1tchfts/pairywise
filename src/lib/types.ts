@@ -37,6 +37,26 @@ export type Comparison = z.infer<typeof ComparisonSchema>;
 
 export type Algorithm = 'elo' | 'bradleyTerry';
 
+export const TierSchema = z.enum(['S', 'A', 'B', 'C', 'D']);
+export type Tier = z.infer<typeof TierSchema>;
+export const TIERS: Tier[] = ['S', 'A', 'B', 'C', 'D'];
+
+export const BracketMatchSchema = z.object({
+  id: z.string(),
+  round: z.number(),
+  aId: z.string().nullable(),
+  bId: z.string().nullable(),
+  winnerId: z.string().nullable(),
+});
+export type BracketMatch = z.infer<typeof BracketMatchSchema>;
+
+export const BracketSchema = z.object({
+  seed: z.array(z.string()),
+  matches: z.array(BracketMatchSchema),
+  championId: z.string().nullable().optional(),
+});
+export type Bracket = z.infer<typeof BracketSchema>;
+
 export const ListSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -45,6 +65,9 @@ export const ListSchema = z.object({
   items: z.array(ItemSchema).default([]),
   comparisons: z.array(ComparisonSchema).default([]),
   algorithmDefault: z.enum(['elo', 'bradleyTerry']).default('elo'),
+  tierAssignments: z.record(z.string(), TierSchema).default({}),
+  directRatings: z.record(z.string(), z.number()).default({}),
+  bracket: BracketSchema.nullable().default(null),
   createdAt: z.number(),
   updatedAt: z.number(),
 });

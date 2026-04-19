@@ -2,7 +2,15 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Algorithm, Comparison, Item, RankList } from './types';
+import type {
+  Algorithm,
+  Bracket,
+  BracketMatch,
+  Comparison,
+  Item,
+  RankList,
+  Tier,
+} from './types';
 import { uid } from './utils';
 
 type State = {
@@ -23,6 +31,13 @@ type Actions = {
   undoLastComparison: (listId: string) => Comparison | null;
   setAlgorithmDefault: (listId: string, algo: Algorithm) => void;
   importList: (list: RankList) => string;
+  setTier: (listId: string, itemId: string, tier: Tier | null) => void;
+  clearTiers: (listId: string) => void;
+  setDirectRating: (listId: string, itemId: string, rating: number) => void;
+  clearDirectRatings: (listId: string) => void;
+  initBracket: (listId: string, seed?: string[]) => void;
+  advanceBracketMatch: (listId: string, matchId: string, winnerId: string) => void;
+  resetBracket: (listId: string) => void;
 };
 
 export const useStore = create<State & Actions>()(
@@ -45,6 +60,9 @@ export const useStore = create<State & Actions>()(
               items: [],
               comparisons: [],
               algorithmDefault: 'elo',
+              tierAssignments: {},
+              directRatings: {},
+              bracket: null,
               createdAt: now,
               updatedAt: now,
             },
@@ -225,6 +243,137 @@ export const useStore = create<State & Actions>()(
           };
         }),
 
+      setTier: (listId, itemId, tier) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list) return s;
+          const next = { ...(list.tierAssignments ?? {}) };
+          if (tier === null) delete next[itemId];
+          else next[itemId] = tier;
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: { ...list, tierAssignments: next, updatedAt: Date.now() },
+            },
+          };
+        }),
+
+      clearTiers: (listId) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list) return s;
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: { ...list, tierAssignments: {}, updatedAt: Date.now() },
+            },
+          };
+        }),
+
+      setDirectRating: (listId, itemId, rating) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list) return s;
+          const clamped = Math.max(1, Math.min(10, Math.round(rating)));
+          const next = { ...(list.directRatings ?? {}), [itemId]: clamped };
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: { ...list, directRatings: next, updatedAt: Date.now() },
+            },
+          };
+        }),
+
+      clearDirectRatings: (listId) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list) return s;
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: { ...list, directRatings: {}, updatedAt: Date.now() },
+            },
+          };
+        }),
+
+      initBracket: (listId, customSeed) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list || list.items.length < 2) return s;
+          const seed =
+            customSeed && customSeed.length > 0
+              ? customSeed.slice()
+              : shuffle(list.items.map((i) => i.id));
+          const bracket = buildBracket(seed);
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: { ...list, bracket, updatedAt: Date.now() },
+            },
+          };
+        }),
+
+      advanceBracketMatch: (listId, matchId, winnerId) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list?.bracket) return s;
+          const br = {
+            ...list.bracket,
+            matches: list.bracket.matches.map((m) => ({ ...m })),
+          };
+          const match = br.matches.find((m) => m.id === matchId);
+          if (!match) return s;
+          if (match.aId !== winnerId && match.bId !== winnerId) return s;
+          match.winnerId = winnerId;
+
+          // Propagate to next round.
+          const nextRound = match.round + 1;
+          const indexInRound = Math.floor(
+            br.matches.findIndex((m) => m.id === matchId) -
+              firstIndexOfRound(br.matches, match.round),
+          );
+          const nextMatchIndex = Math.floor(indexInRound / 2);
+          const next = br.matches.find(
+            (m, i) =>
+              m.round === nextRound &&
+              i - firstIndexOfRound(br.matches, nextRound) === nextMatchIndex,
+          );
+          if (next) {
+            if (indexInRound % 2 === 0) next.aId = winnerId;
+            else next.bId = winnerId;
+            // Autoadvance byes.
+            if (next.aId && !next.bId && hasNoFutureOpponent(br, next)) {
+              next.winnerId = next.aId;
+            }
+          }
+
+          const final = br.matches[br.matches.length - 1];
+          const championId = final?.winnerId ?? null;
+
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: {
+                ...list,
+                bracket: { ...br, championId },
+                updatedAt: Date.now(),
+              },
+            },
+          };
+        }),
+
+      resetBracket: (listId) =>
+        set((s) => {
+          const list = s.lists[listId];
+          if (!list) return s;
+          return {
+            lists: {
+              ...s.lists,
+              [listId]: { ...list, bracket: null, updatedAt: Date.now() },
+            },
+          };
+        }),
+
       importList: (src) => {
         const newListId = uid();
         const now = Date.now();
@@ -263,7 +412,7 @@ export const useStore = create<State & Actions>()(
     {
       name: 'pairywise-store',
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted, fromVersion) => {
         const state = persisted as State | undefined;
         if (!state || !state.lists) return state ?? { lists: {}, order: [] };
@@ -276,6 +425,13 @@ export const useStore = create<State & Actions>()(
             }
           }
         }
+        if (fromVersion < 3) {
+          for (const list of Object.values(state.lists)) {
+            if (!list.tierAssignments) list.tierAssignments = {};
+            if (!list.directRatings) list.directRatings = {};
+            if (list.bracket === undefined) list.bracket = null;
+          }
+        }
         return state;
       },
     },
@@ -284,4 +440,58 @@ export const useStore = create<State & Actions>()(
 
 export function selectList(id: string) {
   return (s: State) => s.lists[id];
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function buildBracket(seed: string[]): Bracket {
+  const n = seed.length;
+  // Pad to next power of two with nulls (byes)
+  const size = 1 << Math.ceil(Math.log2(Math.max(2, n)));
+  const padded: (string | null)[] = seed.slice();
+  while (padded.length < size) padded.push(null);
+  const matches: BracketMatch[] = [];
+  let round = 0;
+  let pairs: (string | null)[] = padded;
+  while (pairs.length > 1) {
+    const next: (string | null)[] = [];
+    for (let i = 0; i < pairs.length; i += 2) {
+      const a = pairs[i];
+      const b = pairs[i + 1];
+      const match: BracketMatch = {
+        id: uid(),
+        round,
+        aId: a,
+        bId: b,
+        winnerId: null,
+      };
+      // Auto-advance byes in round 0.
+      if (round === 0) {
+        if (a && !b) match.winnerId = a;
+        else if (!a && b) match.winnerId = b;
+      }
+      matches.push(match);
+      next.push(match.winnerId);
+    }
+    pairs = next;
+    round++;
+  }
+  return { seed, matches, championId: null };
+}
+
+function firstIndexOfRound(matches: BracketMatch[], round: number) {
+  return matches.findIndex((m) => m.round === round);
+}
+
+function hasNoFutureOpponent(bracket: Bracket, match: BracketMatch) {
+  // For byes in later rounds we don't auto-advance — only round 0 has real byes.
+  void bracket;
+  return match.round === 0;
 }

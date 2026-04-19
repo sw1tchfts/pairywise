@@ -104,7 +104,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         <p className="mt-1 text-foreground/70">{list.description}</p>
       )}
 
-      <div className="mt-6 flex items-center gap-2 sm:gap-3 flex-wrap">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
         <Link
           href={`/lists/${list.id}/vote`}
           aria-disabled={!canVote}
@@ -114,17 +114,38 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
               : 'bg-foreground/20 text-foreground/50 pointer-events-none'
           }`}
         >
-          Start voting
+          A vs B
+        </Link>
+        <Link
+          href={`/lists/${list.id}/tiers`}
+          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
+        >
+          Tier list
+        </Link>
+        <Link
+          href={`/lists/${list.id}/rate`}
+          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
+        >
+          Rate 1–10
+        </Link>
+        <Link
+          href={`/lists/${list.id}/bracket`}
+          aria-disabled={!canVote}
+          className={`rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 ${
+            canVote ? '' : 'opacity-40 pointer-events-none'
+          }`}
+        >
+          Tournament
         </Link>
         <Link
           href={`/lists/${list.id}/results`}
-          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
+          className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 ml-auto"
         >
-          View results
+          Results
         </Link>
-        <span className="text-sm text-foreground/60 w-full sm:w-auto sm:ml-auto">
-          {list.items.length} items · {list.comparisons.length} votes
-        </span>
+      </div>
+      <div className="mt-2 text-sm text-foreground/60">
+        {list.items.length} items · {list.comparisons.length} votes
       </div>
 
       <section className="mt-8">
