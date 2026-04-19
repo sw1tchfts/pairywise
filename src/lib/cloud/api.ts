@@ -151,6 +151,53 @@ export async function joinList(listId: string): Promise<void> {
   if (error) throw error;
 }
 
+export type ListMember = {
+  userId: string;
+  role: string;
+  joinedAt: number;
+};
+
+type ListMemberRow = {
+  user_id: string;
+  role: string;
+  joined_at: string;
+};
+
+export async function fetchListMembers(listId: string): Promise<ListMember[]> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase
+    .from('list_members')
+    .select('user_id, role, joined_at')
+    .eq('list_id', listId)
+    .order('joined_at', { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as ListMemberRow[]).map((r) => ({
+    userId: r.user_id,
+    role: r.role,
+    joinedAt: new Date(r.joined_at).getTime(),
+  }));
+}
+
+export async function removeListMember(
+  listId: string,
+  userId: string,
+): Promise<void> {
+  const supabase = getBrowserClient();
+  const { error } = await supabase
+    .from('list_members')
+    .delete()
+    .eq('list_id', listId)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+/** Current user leaves the list. */
+export async function leaveList(listId: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated.');
+  await removeListMember(listId, userId);
+}
+
 // ---------- Lists ----------
 
 export async function insertList(list: RankList): Promise<void> {

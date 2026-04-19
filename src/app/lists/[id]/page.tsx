@@ -105,7 +105,10 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const hasPairwise = list.comparisons.length > 0;
 
   const actions: OverflowAction[] = [];
-  if (ownedByMe) actions.push({ label: 'Share', onClick: () => setShareOpen(true) });
+  actions.push({
+    label: ownedByMe ? 'Share & members' : 'Members',
+    onClick: () => setShareOpen(true),
+  });
   actions.push({
     label: 'Export JSON',
     onClick: () => {
