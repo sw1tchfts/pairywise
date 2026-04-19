@@ -4,7 +4,6 @@ import { use } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { VoteScreen } from '@/components/VoteScreen';
-import { ModeSwitcher } from '@/components/ModeSwitcher';
 
 type Params = { id: string };
 
@@ -25,12 +24,14 @@ export default function VotePage({ params }: { params: Promise<Params> }) {
 
   return (
     <>
-      <ModeSwitcher
-        listId={list.id}
-        listTitle={list.title}
-        current="vote"
-        itemCount={list.items.length}
-      />
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 text-sm">
+        <Link
+          href={`/lists/${list.id}`}
+          className="text-foreground/60 hover:text-foreground truncate block"
+        >
+          ← {list.title}
+        </Link>
+      </div>
       <VoteScreen list={list} />
     </>
   );

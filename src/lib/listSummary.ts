@@ -1,10 +1,10 @@
-import { combineRankings } from './ranking/combined';
 import { comparisonsRemaining } from './ranking/pairSelection';
+import { rankElo } from './ranking/elo';
 import type { RankList } from './types';
 
 export type ListSummary = {
   listId: string;
-  topItems: { title: string; score: number | null }[];
+  topItems: { title: string; score: number }[];
   pairsDone: number;
   pairsTotal: number;
   progress: number;
@@ -13,11 +13,14 @@ export type ListSummary = {
 
 /** Precomputed summaries for every list, used to render home cards + sort. */
 export function summarize(list: RankList): ListSummary {
-  const combined = combineRankings(list);
-  const topItems = combined.slice(0, 3).flatMap((r) => {
-    const item = list.items.find((i) => i.id === r.itemId);
-    return item ? [{ title: item.title, score: r.score }] : [];
-  });
+  const rankings = rankElo(list.items, list.comparisons);
+  const topItems = rankings
+    .filter((r) => r.comparisons > 0)
+    .slice(0, 3)
+    .flatMap((r) => {
+      const item = list.items.find((i) => i.id === r.itemId);
+      return item ? [{ title: item.title, score: r.score }] : [];
+    });
   const pairsDone = list.comparisons.length;
   const remaining = comparisonsRemaining(list.items, list.comparisons);
   const pairsTotal = pairsDone + remaining;

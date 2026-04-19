@@ -3,12 +3,9 @@
 import { create } from 'zustand';
 import type {
   Algorithm,
-  Bracket,
-  BracketMatch,
   Comparison,
   Item,
   RankList,
-  Tier,
   Visibility,
 } from './types';
 import { uid } from './utils';
@@ -49,13 +46,6 @@ type Actions = {
   undoLastComparison: (listId: string) => Comparison | null;
   setAlgorithmDefault: (listId: string, algo: Algorithm) => void;
   importList: (list: RankList) => string;
-  setTier: (listId: string, itemId: string, tier: Tier | null) => void;
-  clearTiers: (listId: string) => void;
-  setDirectRating: (listId: string, itemId: string, rating: number) => void;
-  clearDirectRatings: (listId: string) => void;
-  initBracket: (listId: string, seed?: string[]) => void;
-  advanceBracketMatch: (listId: string, matchId: string, winnerId: string) => void;
-  resetBracket: (listId: string) => void;
 };
 
 function reportCloudError(scope: string, err: unknown) {
@@ -357,155 +347,6 @@ export const useStore = create<State & Actions>()((set, get) => ({
     api.updateAlgorithm(listId, algo).catch((e) => reportCloudError('setAlgorithmDefault', e));
   },
 
-  setTier: (listId, itemId, tier) => {
-    let next: Record<string, Tier> = {};
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list) return s;
-      next = { ...list.tierAssignments };
-      if (tier === null) delete next[itemId];
-      else next[itemId] = tier;
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, tierAssignments: next, updatedAt: Date.now() },
-        },
-      };
-    });
-    api.updateTierAssignments(listId, next).catch((e) => reportCloudError('setTier', e));
-  },
-
-  clearTiers: (listId) => {
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list) return s;
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, tierAssignments: {}, updatedAt: Date.now() },
-        },
-      };
-    });
-    api.updateTierAssignments(listId, {}).catch((e) => reportCloudError('clearTiers', e));
-  },
-
-  setDirectRating: (listId, itemId, rating) => {
-    let next: Record<string, number> = {};
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list) return s;
-      const clamped = Math.max(1, Math.min(10, Math.round(rating)));
-      next = { ...list.directRatings, [itemId]: clamped };
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, directRatings: next, updatedAt: Date.now() },
-        },
-      };
-    });
-    api.updateDirectRatings(listId, next).catch((e) => reportCloudError('setDirectRating', e));
-  },
-
-  clearDirectRatings: (listId) => {
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list) return s;
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, directRatings: {}, updatedAt: Date.now() },
-        },
-      };
-    });
-    api.updateDirectRatings(listId, {}).catch((e) => reportCloudError('clearDirectRatings', e));
-  },
-
-  initBracket: (listId, customSeed) => {
-    let newBracket: Bracket | null = null;
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list || list.items.length < 2) return s;
-      const seed =
-        customSeed && customSeed.length > 0
-          ? customSeed.slice()
-          : shuffle(list.items.map((i) => i.id));
-      newBracket = buildBracket(seed);
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, bracket: newBracket, updatedAt: Date.now() },
-        },
-      };
-    });
-    if (newBracket) {
-      api.updateBracket(listId, newBracket).catch((e) => reportCloudError('initBracket', e));
-    }
-  },
-
-  advanceBracketMatch: (listId, matchId, winnerId) => {
-    let updated: Bracket | null = null;
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list?.bracket) return s;
-      const br = {
-        ...list.bracket,
-        matches: list.bracket.matches.map((m) => ({ ...m })),
-      };
-      const match = br.matches.find((m) => m.id === matchId);
-      if (!match) return s;
-      if (match.aId !== winnerId && match.bId !== winnerId) return s;
-      match.winnerId = winnerId;
-
-      const nextRound = match.round + 1;
-      const indexInRound = Math.floor(
-        br.matches.findIndex((m) => m.id === matchId) -
-          firstIndexOfRound(br.matches, match.round),
-      );
-      const nextMatchIndex = Math.floor(indexInRound / 2);
-      const next = br.matches.find(
-        (m, i) =>
-          m.round === nextRound &&
-          i - firstIndexOfRound(br.matches, nextRound) === nextMatchIndex,
-      );
-      if (next) {
-        if (indexInRound % 2 === 0) next.aId = winnerId;
-        else next.bId = winnerId;
-        if (next.aId && !next.bId && hasNoFutureOpponent(br, next)) {
-          next.winnerId = next.aId;
-        }
-      }
-
-      const final = br.matches[br.matches.length - 1];
-      const championId = final?.winnerId ?? null;
-      updated = { ...br, championId };
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, bracket: updated, updatedAt: Date.now() },
-        },
-      };
-    });
-    if (updated) {
-      api
-        .updateBracket(listId, updated)
-        .catch((e) => reportCloudError('advanceBracketMatch', e));
-    }
-  },
-
-  resetBracket: (listId) => {
-    set((s) => {
-      const list = s.lists[listId];
-      if (!list) return s;
-      return {
-        lists: {
-          ...s.lists,
-          [listId]: { ...list, bracket: null, updatedAt: Date.now() },
-        },
-      };
-    });
-    api.updateBracket(listId, null).catch((e) => reportCloudError('resetBracket', e));
-  },
-
   importList: (src) => {
     const newListId = uid();
     const now = Date.now();
@@ -558,55 +399,4 @@ export const useStore = create<State & Actions>()((set, get) => ({
 
 export function selectList(id: string) {
   return (s: State) => s.lists[id];
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const out = arr.slice();
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
-function buildBracket(seed: string[]): Bracket {
-  const n = seed.length;
-  const size = 1 << Math.ceil(Math.log2(Math.max(2, n)));
-  const padded: (string | null)[] = seed.slice();
-  while (padded.length < size) padded.push(null);
-  const matches: BracketMatch[] = [];
-  let round = 0;
-  let pairs: (string | null)[] = padded;
-  while (pairs.length > 1) {
-    const next: (string | null)[] = [];
-    for (let i = 0; i < pairs.length; i += 2) {
-      const a = pairs[i];
-      const b = pairs[i + 1];
-      const match: BracketMatch = {
-        id: uid(),
-        round,
-        aId: a,
-        bId: b,
-        winnerId: null,
-      };
-      if (round === 0) {
-        if (a && !b) match.winnerId = a;
-        else if (!a && b) match.winnerId = b;
-      }
-      matches.push(match);
-      next.push(match.winnerId);
-    }
-    pairs = next;
-    round++;
-  }
-  return { seed, matches, championId: null };
-}
-
-function firstIndexOfRound(matches: BracketMatch[], round: number) {
-  return matches.findIndex((m) => m.round === round);
-}
-
-function hasNoFutureOpponent(bracket: Bracket, match: BracketMatch) {
-  void bracket;
-  return match.round === 0;
 }

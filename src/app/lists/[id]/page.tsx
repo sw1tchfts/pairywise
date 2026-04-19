@@ -12,7 +12,6 @@ import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useToast } from '@/components/Toaster';
 import { downloadJSON, exportList, slugify } from '@/lib/io';
-import { CombinedResults } from '@/components/results/CombinedResults';
 import { PairwiseResults } from '@/components/results/PairwiseResults';
 
 type Params = { id: string };
@@ -35,7 +34,6 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const currentUserId = useCurrentUserId();
   const ownerIds = list?.ownerId ? [list.ownerId] : [];
   const profiles = useProfiles(ownerIds);
@@ -104,11 +102,6 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
 
   const canVote = list.items.length >= 2;
   const ownedByMe = !list.ownerId || list.ownerId === currentUserId;
-  const hasAnySignal =
-    list.comparisons.length > 0 ||
-    Object.keys(list.tierAssignments).length > 0 ||
-    Object.keys(list.directRatings).length > 0 ||
-    Boolean(list.bracket);
   const hasPairwise = list.comparisons.length > 0;
 
   const actions: OverflowAction[] = [];
@@ -295,74 +288,14 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
 
       {list.items.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-lg font-semibold">Current ranking</h2>
+          <h2 className="text-lg font-semibold">Ranking</h2>
           <p className="text-sm text-foreground/60 mt-1 mb-3">
-            Blends your A-vs-B votes, tier placements, 1–10 scores, and bracket
-            results into one order. {hasAnySignal
-              ? 'Drag the weights below to rebalance.'
-              : 'Use any of the ways-to-rank below to start building it.'}
+            Built from your head-to-head votes. Tap any row to see its
+            matchup record.
           </p>
-          <CombinedResults list={list} />
+          <PairwiseResults list={list} />
         </section>
       )}
-
-      {hasPairwise && (
-        <section className="mt-8">
-          <button
-            type="button"
-            onClick={() => setAnalyticsOpen((v) => !v)}
-            aria-expanded={analyticsOpen}
-            className="w-full flex items-center justify-between rounded-md border border-foreground/15 px-3 py-2 text-sm hover:bg-foreground/5"
-          >
-            <span className="font-medium">Pairwise analytics</span>
-            <span aria-hidden className={`transition-transform ${analyticsOpen ? 'rotate-180' : ''}`}>
-              ▾
-            </span>
-          </button>
-          {analyticsOpen && (
-            <div className="mt-3">
-              <PairwiseResults list={list} />
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="mt-10">
-        <h2 className="text-lg font-semibold">Ways to rank</h2>
-        <p className="text-sm text-foreground/60 mt-1 mb-3">
-          Four independent activities. Every signal you add feeds the ranking
-          above.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-2">
-          <WayCard
-            href={`/lists/${list.id}/vote`}
-            title="A vs B"
-            subtitle="Compare two items at a time"
-            disabled={!canVote}
-            primary
-            progress={list.comparisons.length}
-          />
-          <WayCard
-            href={`/lists/${list.id}/tiers`}
-            title="Tier list"
-            subtitle="Drag items into S / A / B / C / D"
-            progress={Object.keys(list.tierAssignments).length}
-          />
-          <WayCard
-            href={`/lists/${list.id}/rate`}
-            title="Rate 1–10"
-            subtitle="Score each item on a slider"
-            progress={Object.keys(list.directRatings).length}
-          />
-          <WayCard
-            href={`/lists/${list.id}/bracket`}
-            title="Tournament"
-            subtitle="Single-elimination bracket"
-            disabled={!canVote}
-            progress={list.bracket ? list.bracket.seed.length : 0}
-          />
-        </div>
-      </section>
 
       <ItemEditor
         open={editorOpen}
@@ -378,48 +311,6 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
       />
     </div>
   );
-}
-
-function WayCard({
-  href,
-  title,
-  subtitle,
-  disabled,
-  primary,
-  progress,
-}: {
-  href: string;
-  title: string;
-  subtitle: string;
-  disabled?: boolean;
-  primary?: boolean;
-  progress: number;
-}) {
-  const body = (
-    <div
-      className={`rounded-lg border p-3 flex items-center justify-between gap-3 ${
-        disabled
-          ? 'border-foreground/10 text-foreground/40'
-          : primary
-            ? 'border-foreground hover:bg-foreground/5'
-            : 'border-foreground/15 hover:border-foreground/40'
-      }`}
-    >
-      <div className="min-w-0">
-        <div className="font-medium">{title}</div>
-        <div className="text-xs text-foreground/60 mt-0.5">{subtitle}</div>
-      </div>
-      <div className="text-xs text-foreground/50 shrink-0 text-right">
-        {progress > 0 ? (
-          <span className="font-mono tabular-nums">{progress}</span>
-        ) : (
-          <span className="text-foreground/30">Not started</span>
-        )}
-      </div>
-    </div>
-  );
-  if (disabled) return body;
-  return <Link href={href}>{body}</Link>;
 }
 
 function ItemThumb({ item }: { item: Item }) {

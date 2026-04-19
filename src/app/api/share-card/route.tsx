@@ -11,7 +11,7 @@ import {
   type ItemRow,
   type ListRow,
 } from '@/lib/cloud/mappers';
-import { combineRankings } from '@/lib/ranking/combined';
+import { rankElo } from '@/lib/ranking/elo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,15 +65,15 @@ export async function GET(request: NextRequest) {
     ((compsRes.data ?? []) as ComparisonRow[]).map(comparisonFromRow),
   );
 
-  const combined = combineRankings(list);
+  const rankings = rankElo(list.items, list.comparisons);
   const itemsById = new Map(list.items.map((i) => [i.id, i]));
-  const top = combined
-    .filter((r) => r.score !== null)
+  const top = rankings
+    .filter((r) => r.comparisons > 0)
     .slice(0, 10)
     .map((r, i) => ({
       rank: i + 1,
       title: itemsById.get(r.itemId)?.title ?? '—',
-      score: r.score ?? 0,
+      score: r.rating,
     }));
 
   return new ImageResponse(
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
                     fontSize: 24,
                   }}
                 >
-                  {row.score.toFixed(2)}
+                  {row.score.toFixed(0)}
                 </span>
               </div>
             ))
