@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import type { Item } from '@/lib/types';
 import { ItemEditor } from '@/components/ItemEditor';
+import { ShareDialog } from '@/components/ShareDialog';
+import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
 import { useToast } from '@/components/Toaster';
 
 type Params = { id: string };
@@ -25,6 +27,8 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const currentUserId = useCurrentUserId();
 
   useEffect(() => {
     if (shouldAutoOpen && !autoOpenedRef.current) {
@@ -143,7 +147,21 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         >
           Results
         </Link>
+        {(!list.ownerId || list.ownerId === currentUserId) && (
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
+          >
+            Share
+          </button>
+        )}
       </div>
+      <ShareDialog
+        listId={list.id}
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+      />
       <div className="mt-2 text-sm text-foreground/60">
         {list.items.length} items · {list.comparisons.length} votes
       </div>

@@ -1,20 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
 import { useToast } from './Toaster';
 
 type Mode = 'signin' | 'signup';
 
+function safeNext(next: string | null): string {
+  // Only allow same-origin relative paths, to avoid open-redirect.
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
+  return next;
+}
+
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get('next'));
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    searchParams.get('error'),
+  );
+  const [needsConfirm, setNeedsConfirm] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,18 +34,30 @@ export function AuthForm({ mode }: { mode: Mode }) {
     const supabase = getBrowserClient();
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        toast.push('Account created. Check your email to confirm.', {
-          kind: 'success',
+        const emailRedirectTo =
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+            : undefined;
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo },
         });
-        router.push('/');
-        router.refresh();
+        if (error) throw error;
+        // If the project has email confirmation disabled, signUp returns a
+        // session and the user is signed in immediately.
+        if (data.session) {
+          toast.push('Welcome to pairywise', { kind: 'success' });
+          router.push(next);
+          router.refresh();
+        } else {
+          setNeedsConfirm(true);
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.push('Welcome back', { kind: 'success' });
-        router.push('/');
+        router.push(next);
         router.refresh();
       }
     } catch (err) {
@@ -49,12 +72,29 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <div className="mx-auto max-w-sm px-4 sm:px-6 py-10 sm:py-14 text-center">
         <h1 className="text-2xl font-semibold mb-2">Auth not configured</h1>
         <p className="text-sm text-foreground/60">
-          The cloud backend is not connected on this deployment yet. Local-only
-          features still work.
+          The cloud backend is not connected on this deployment yet.
         </p>
       </div>
     );
   }
+
+  if (needsConfirm) {
+    return (
+      <div className="mx-auto max-w-sm px-4 sm:px-6 py-10 sm:py-14 text-center">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">
+          Check your email
+        </h1>
+        <p className="text-sm text-foreground/70 mt-2">
+          We sent a confirmation link to <b>{email}</b>. Click it to finish
+          signing up — you&apos;ll land back here and your account will be
+          ready to go.
+        </p>
+      </div>
+    );
+  }
+
+  const linkHref = (target: 'signin' | 'signup') =>
+    next === '/' ? `/${target}` : `/${target}?next=${encodeURIComponent(next)}`;
 
   return (
     <div className="mx-auto max-w-sm px-4 sm:px-6 py-10 sm:py-14">
@@ -62,9 +102,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {mode === 'signup' ? 'Create your account' : 'Sign in'}
       </h1>
       <p className="text-sm text-foreground/60 mb-6">
-        {mode === 'signup'
-          ? 'Save lists across devices and share them with others.'
-          : 'Welcome back to pairywise.'}
+        {next.startsWith('/shared/')
+          ? 'Sign in to join the shared list — your invite is saved.'
+          : mode === 'signup'
+            ? 'Save lists across devices and share them with others.'
+            : 'Welcome back to pairywise.'}
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <label className="block">
@@ -108,14 +150,14 @@ export function AuthForm({ mode }: { mode: Mode }) {
         {mode === 'signup' ? (
           <>
             Already have an account?{' '}
-            <Link href="/signin" className="font-medium hover:underline">
+            <Link href={linkHref('signin')} className="font-medium hover:underline">
               Sign in
             </Link>
           </>
         ) : (
           <>
             New here?{' '}
-            <Link href="/signup" className="font-medium hover:underline">
+            <Link href={linkHref('signup')} className="font-medium hover:underline">
               Create an account
             </Link>
           </>
