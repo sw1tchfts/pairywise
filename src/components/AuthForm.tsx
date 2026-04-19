@@ -23,7 +23,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
     const supabase = getBrowserClient();
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/` },
+        });
         if (error) throw error;
         toast.push('Account created. Check your email to confirm.', {
           kind: 'success',
