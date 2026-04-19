@@ -34,20 +34,22 @@ export default function ResultsPage({ params }: { params: Promise<Params> }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
       <div className="mb-2 text-sm">
-        <Link href={`/lists/${id}`} className="text-foreground/60 hover:text-foreground">
+        <Link href={`/lists/${id}`} className="text-foreground/60 hover:text-foreground truncate block">
           ← {list.title}
         </Link>
       </div>
-      <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Leaderboard</h1>
+      <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+            Leaderboard
+          </h1>
           <p className="text-sm text-foreground/60 mt-1">
             {list.items.length} items · {list.comparisons.length} votes
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <AlgorithmToggle
             value={algorithm}
             onChange={(a) => {

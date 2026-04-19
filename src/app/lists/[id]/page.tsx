@@ -69,18 +69,20 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const canVote = list.items.length >= 2;
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
       <div className="mb-2 text-sm">
         <Link href="/" className="text-foreground/60 hover:text-foreground">
           ← All lists
         </Link>
       </div>
-      <h1 className="text-3xl font-semibold tracking-tight">{list.title}</h1>
+      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
+        {list.title}
+      </h1>
       {list.description && (
         <p className="mt-1 text-foreground/70">{list.description}</p>
       )}
 
-      <div className="mt-6 flex items-center gap-3 flex-wrap">
+      <div className="mt-6 flex items-center gap-2 sm:gap-3 flex-wrap">
         <Link
           href={`/lists/${list.id}/vote`}
           aria-disabled={!canVote}
@@ -98,7 +100,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         >
           View results
         </Link>
-        <span className="text-sm text-foreground/60 ml-auto">
+        <span className="text-sm text-foreground/60 w-full sm:w-auto sm:ml-auto">
           {list.items.length} items · {list.comparisons.length} votes
         </span>
       </div>
@@ -132,12 +134,12 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
             {list.items.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center gap-3 rounded-md border border-black/10 dark:border-white/10 p-2"
+                className="flex items-center gap-3 rounded-md border border-black/10 dark:border-white/10 p-2.5"
               >
                 <ItemThumb item={item} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{item.title}</div>
-                  <div className="text-xs text-foreground/60 truncate flex items-center gap-2">
+                  <div className="text-xs text-foreground/60 truncate">
                     {[
                       item.imageUrl && 'image',
                       item.audioUrl && 'audio',
@@ -148,16 +150,18 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
                       .join(' · ') || item.description || 'Text only'}
                     {item.tags.length > 0 && (
                       <span className="text-foreground/50">
-                        · {item.tags.join(', ')}
+                        {' · '}
+                        {item.tags.join(', ')}
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => openEdit(item)}
-                    className="text-xs px-2 py-1 rounded border border-foreground/20 hover:bg-foreground/5"
+                    aria-label={`Edit ${item.title}`}
+                    className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
                   >
                     Edit
                   </button>
@@ -168,9 +172,11 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
                         removeItem(list.id, item.id);
                       }
                     }}
-                    className="text-xs px-2 py-1 rounded border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
+                    aria-label={`Remove ${item.title}`}
+                    className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
                   >
-                    Remove
+                    <span className="sm:hidden" aria-hidden>×</span>
+                    <span className="hidden sm:inline">Remove</span>
                   </button>
                 </div>
               </li>

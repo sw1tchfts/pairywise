@@ -29,26 +29,26 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <header className="border-b border-black/10 dark:border-white/10">
-          <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
             <Link href="/" className="text-lg font-semibold tracking-tight">
               pairywise
             </Link>
-            <nav className="flex items-center gap-4 text-sm text-foreground/70">
-              <Link href="/" className="hover:text-foreground">
+            <nav className="flex items-center gap-2 sm:gap-4 text-sm text-foreground/70">
+              <Link href="/" className="hover:text-foreground hidden sm:inline">
                 My lists
               </Link>
               <Link
                 href="/lists/new"
-                className="rounded-md bg-foreground text-background px-3 py-1.5 font-medium hover:opacity-90"
+                className="rounded-md bg-foreground text-background px-3 py-1.5 font-medium hover:opacity-90 whitespace-nowrap"
               >
-                New list
+                + New list
               </Link>
             </nav>
           </div>
         </header>
         <main className="flex-1">{children}</main>
         <footer className="border-t border-black/10 dark:border-white/10">
-          <div className="mx-auto max-w-5xl px-6 py-4 text-xs text-foreground/60">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 py-4 text-xs text-foreground/60">
             pairywise · client-only MVP · data lives in your browser
           </div>
         </footer>

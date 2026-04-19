@@ -10,10 +10,10 @@ export default function HomePage() {
   const duplicateList = useStore((s) => s.duplicateList);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Your lists</h1>
-        <p className="mt-1 text-foreground/60">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Your lists</h1>
+        <p className="mt-1 text-foreground/60 text-sm sm:text-base">
           Create a list of things, vote between pairs, see them ranked.
         </p>
       </div>
@@ -27,7 +27,7 @@ export default function HomePage() {
             return (
               <li
                 key={id}
-                className="group flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 p-4 hover:border-black/30 dark:hover:border-white/30 transition"
+                className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-black/10 dark:border-white/10 p-4 hover:border-black/30 dark:hover:border-white/30 transition"
               >
                 <Link href={`/lists/${id}`} className="flex-1 min-w-0">
                   <div className="font-medium truncate">{list.title}</div>
@@ -36,11 +36,11 @@ export default function HomePage() {
                     {list.tags.length > 0 && ` · ${list.tags.join(', ')}`}
                   </div>
                 </Link>
-                <div className="flex items-center gap-2 opacity-70 group-hover:opacity-100 transition">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => duplicateList(id)}
-                    className="text-sm px-2 py-1 rounded hover:bg-foreground/5"
+                    className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
                   >
                     Duplicate
                   </button>
@@ -49,7 +49,7 @@ export default function HomePage() {
                     onClick={() => {
                       if (confirm(`Delete "${list.title}"?`)) deleteList(id);
                     }}
-                    className="text-sm px-2 py-1 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
                   >
                     Delete
                   </button>

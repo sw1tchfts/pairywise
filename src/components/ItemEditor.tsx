@@ -104,14 +104,14 @@ function ItemEditorForm({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-background w-full max-w-lg rounded-lg shadow-xl border border-black/10 dark:border-white/10 max-h-[90vh] overflow-y-auto"
+        className="bg-background w-full max-w-lg rounded-t-xl sm:rounded-lg shadow-xl border border-black/10 dark:border-white/10 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
               {isEditing ? 'Edit item' : 'New item'}

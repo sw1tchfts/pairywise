@@ -13,7 +13,7 @@ export function VoteCard({ item, onSelect, hotkeyLabel }: Props) {
     <button
       type="button"
       onClick={onSelect}
-      className="group relative flex flex-col items-stretch text-left rounded-xl border-2 border-black/10 dark:border-white/15 p-5 hover:border-foreground focus:border-foreground focus:outline-none transition overflow-hidden min-h-[320px]"
+      className="group relative flex flex-col items-stretch text-left rounded-xl border-2 border-black/10 dark:border-white/15 p-4 sm:p-5 hover:border-foreground focus:border-foreground focus:outline-none transition overflow-hidden min-h-[240px] sm:min-h-[320px]"
     >
       {item.videoUrl ? (
         <video
@@ -76,11 +76,11 @@ export function VoteCard({ item, onSelect, hotkeyLabel }: Props) {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <kbd className="text-[11px] px-1.5 py-0.5 rounded border border-foreground/20 bg-foreground/5 font-mono">
+        <kbd className="text-[11px] px-1.5 py-0.5 rounded border border-foreground/20 bg-foreground/5 font-mono hidden sm:inline-block">
           {hotkeyLabel}
         </kbd>
-        <span className="text-sm text-foreground/60 group-hover:text-foreground">
-          Pick this →
+        <span className="text-sm font-medium text-foreground/70 group-hover:text-foreground ml-auto">
+          Tap to pick →
         </span>
       </div>
     </button>

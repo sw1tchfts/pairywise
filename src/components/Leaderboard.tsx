@@ -20,10 +20,10 @@ export function Leaderboard({ items, rankings, scoreLabel, onItemClick }: Props)
         return (
           <li
             key={r.itemId}
-            className="flex items-center gap-3 rounded-lg border border-black/10 dark:border-white/10 p-3"
+            className="flex items-center gap-2 sm:gap-3 rounded-lg border border-black/10 dark:border-white/10 p-2.5 sm:p-3"
             onClick={onItemClick ? () => onItemClick(r.itemId) : undefined}
           >
-            <div className="w-8 text-right font-mono text-foreground/60 text-sm">
+            <div className="w-6 sm:w-8 text-right font-mono text-foreground/60 text-sm shrink-0">
               #{r.rank}
             </div>
             {item.imageUrl && (
@@ -31,17 +31,21 @@ export function Leaderboard({ items, rankings, scoreLabel, onItemClick }: Props)
               <img
                 src={item.imageUrl}
                 alt=""
-                className="w-12 h-12 object-cover rounded flex-shrink-0"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded flex-shrink-0"
               />
             )}
             <div className="flex-1 min-w-0">
               <div className="font-medium truncate">{item.title}</div>
-              <div className="text-xs text-foreground/60">
-                {r.wins}W–{r.losses}L ({r.comparisons} votes) · confidence{' '}
-                {(r.confidence * 100).toFixed(0)}%
+              <div className="text-xs text-foreground/60 truncate">
+                {r.wins}W–{r.losses}L
+                <span className="hidden sm:inline">
+                  {' '}
+                  ({r.comparisons} votes) · confidence{' '}
+                  {(r.confidence * 100).toFixed(0)}%
+                </span>
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <div className="font-mono text-sm">{formatScore(r.score)}</div>
               <div className="text-[10px] uppercase tracking-wider text-foreground/50">
                 {scoreLabel}
