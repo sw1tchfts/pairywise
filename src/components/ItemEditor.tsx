@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Item } from '@/lib/types';
+import { UrlPreviewInput } from './UrlPreviewInput';
+import { TmdbSearchInput } from './TmdbSearchInput';
 
 type Props = {
   open: boolean;
@@ -34,6 +36,7 @@ function ItemEditorForm({
   onSave,
   allowAddAnother,
 }: Omit<Props, 'open'>) {
+  const isEditing = Boolean(initial?.title);
   const [draft, setDraft] = useState<Omit<Item, 'id'>>(() => ({
     ...EMPTY,
     ...initial,
@@ -43,7 +46,19 @@ function ItemEditorForm({
   const [tagsInput, setTagsInput] = useState(() =>
     (initial?.tags ?? []).join(', '),
   );
+  const [importMode, setImportMode] = useState<'none' | 'url' | 'tmdb'>('none');
   const titleRef = useRef<HTMLInputElement>(null);
+
+  function handleImport(patch: Partial<Omit<Item, 'id'>>) {
+    setDraft((d) => ({
+      ...d,
+      ...patch,
+      tags: patch.tags ?? d.tags,
+    }));
+    if (patch.tags) setTagsInput(patch.tags.join(', '));
+    setImportMode('none');
+    setTimeout(() => titleRef.current?.focus(), 0);
+  }
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -99,7 +114,7 @@ function ItemEditorForm({
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
-              {initial?.title ? 'Edit item' : 'New item'}
+              {isEditing ? 'Edit item' : 'New item'}
             </h2>
             <button
               type="button"
@@ -109,6 +124,48 @@ function ItemEditorForm({
               Close
             </button>
           </div>
+
+          {!isEditing && (
+            <div className="rounded-md border border-dashed border-black/15 dark:border-white/15 p-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-foreground/60">
+                  Quick import (optional)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setImportMode(importMode === 'url' ? 'none' : 'url')}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    importMode === 'url'
+                      ? 'border-foreground bg-foreground/5'
+                      : 'border-foreground/20 hover:bg-foreground/5'
+                  }`}
+                >
+                  From URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode(importMode === 'tmdb' ? 'none' : 'tmdb')}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    importMode === 'tmdb'
+                      ? 'border-foreground bg-foreground/5'
+                      : 'border-foreground/20 hover:bg-foreground/5'
+                  }`}
+                >
+                  Movie / TV
+                </button>
+              </div>
+              {importMode === 'url' && (
+                <div className="mt-3">
+                  <UrlPreviewInput onImport={handleImport} />
+                </div>
+              )}
+              {importMode === 'tmdb' && (
+                <div className="mt-3">
+                  <TmdbSearchInput onImport={handleImport} />
+                </div>
+              )}
+            </div>
+          )}
 
           <Field label="Title" required>
             <input

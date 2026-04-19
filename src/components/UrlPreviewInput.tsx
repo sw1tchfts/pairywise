@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { Item } from '@/lib/types';
 
 type Props = {
-  onAdd: (item: Omit<Item, 'id'>) => void;
+  onImport: (patch: Partial<Omit<Item, 'id'>>) => void;
 };
 
 type Preview = {
@@ -14,7 +14,7 @@ type Preview = {
   url: string;
 };
 
-export function UrlPreviewInput({ onAdd }: Props) {
+export function UrlPreviewInput({ onImport }: Props) {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,15 +37,14 @@ export function UrlPreviewInput({ onAdd }: Props) {
     }
   }
 
-  function handleAdd() {
+  function handleImport() {
     if (!preview) return;
-    onAdd({
+    onImport({
       type: 'url',
       title: preview.title || preview.url,
       description: preview.description,
       imageUrl: preview.image,
       linkUrl: preview.url,
-      tags: [],
     });
     setPreview(null);
     setUrl('');
@@ -96,10 +95,10 @@ export function UrlPreviewInput({ onAdd }: Props) {
               </button>
               <button
                 type="button"
-                onClick={handleAdd}
+                onClick={handleImport}
                 className="text-sm px-3 py-1 rounded-md bg-foreground text-background font-medium"
               >
-                Add
+                Use this
               </button>
             </div>
           </div>

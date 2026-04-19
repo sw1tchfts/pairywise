@@ -84,16 +84,52 @@ export function VoteScreen({ list }: Props) {
     );
   }
 
+  const totalDone = list.comparisons.length;
+  const estimatedTotal = totalDone + remaining;
+
   if (!pair) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-10 text-center">
-        <p className="text-foreground/70">No more pairs available.</p>
+      <div className="mx-auto max-w-xl px-6 py-16 text-center">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-foreground/10 text-2xl mb-4">
+          ✓
+        </div>
+        <h1 className="text-3xl font-semibold tracking-tight">All done!</h1>
+        <p className="mt-2 text-foreground/70">
+          You&apos;ve compared every pair in{' '}
+          <span className="font-medium text-foreground">{list.title}</span>.{' '}
+          <span className="font-mono">{totalDone}</span> votes total.
+        </p>
+        <div className="mt-6 flex items-center justify-center gap-3 flex-wrap">
+          <Link
+            href={`/lists/${list.id}/results`}
+            className="rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
+          >
+            See the ranking →
+          </Link>
+          <button
+            type="button"
+            onClick={undo}
+            disabled={list.comparisons.length === 0}
+            className="rounded-md border border-foreground/20 px-5 py-2.5 text-sm hover:bg-foreground/5 disabled:opacity-40"
+          >
+            Undo last
+          </button>
+        </div>
+        <p className="mt-8 text-xs text-foreground/50">
+          Want to keep refining? Add more items to the list and you&apos;ll get
+          new pairs to vote on.
+        </p>
+        <div className="mt-4">
+          <Link
+            href={`/lists/${list.id}`}
+            className="text-sm text-foreground/60 hover:text-foreground hover:underline"
+          >
+            ← Back to {list.title}
+          </Link>
+        </div>
       </div>
     );
   }
-
-  const totalDone = list.comparisons.length;
-  const estimatedTotal = totalDone + remaining;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">

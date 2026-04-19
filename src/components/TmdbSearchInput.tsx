@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { Item } from '@/lib/types';
 
 type Props = {
-  onAdd: (item: Omit<Item, 'id'>) => void;
+  onImport: (patch: Partial<Omit<Item, 'id'>>) => void;
 };
 
 type TmdbResult = {
@@ -18,7 +18,7 @@ type TmdbResult = {
   first_air_date?: string;
 };
 
-export function TmdbSearchInput({ onAdd }: Props) {
+export function TmdbSearchInput({ onImport }: Props) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +44,10 @@ export function TmdbSearchInput({ onAdd }: Props) {
     }
   }
 
-  function handleAdd(r: TmdbResult) {
+  function handleImport(r: TmdbResult) {
     const label = r.title ?? r.name ?? 'Untitled';
     const year = (r.release_date ?? r.first_air_date ?? '').slice(0, 4);
-    onAdd({
+    onImport({
       type: 'tmdb',
       title: year ? `${label} (${year})` : label,
       description: r.overview,
@@ -56,8 +56,9 @@ export function TmdbSearchInput({ onAdd }: Props) {
         : undefined,
       externalId: `${r.media_type}:${r.id}`,
       metadata: { mediaType: r.media_type },
-      tags: [],
     });
+    setResults([]);
+    setQ('');
   }
 
   return (
@@ -107,10 +108,10 @@ export function TmdbSearchInput({ onAdd }: Props) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleAdd(r)}
+                  onClick={() => handleImport(r)}
                   className="text-sm px-3 py-1 rounded-md bg-foreground text-background"
                 >
-                  Add
+                  Use this
                 </button>
               </li>
             );

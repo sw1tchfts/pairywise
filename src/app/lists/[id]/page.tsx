@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import type { Item } from '@/lib/types';
-import { ItemPicker } from '@/components/ItemPicker';
 import { ItemEditor } from '@/components/ItemEditor';
 
 type Params = { id: string };
@@ -67,6 +66,8 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
     );
   }
 
+  const canVote = list.items.length >= 2;
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
       <div className="mb-2 text-sm">
@@ -82,10 +83,11 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
       <div className="mt-6 flex items-center gap-3 flex-wrap">
         <Link
           href={`/lists/${list.id}/vote`}
+          aria-disabled={!canVote}
           className={`rounded-md px-4 py-2 font-medium text-sm ${
-            list.items.length < 2
-              ? 'bg-foreground/20 text-foreground/50 pointer-events-none'
-              : 'bg-foreground text-background'
+            canVote
+              ? 'bg-foreground text-background'
+              : 'bg-foreground/20 text-foreground/50 pointer-events-none'
           }`}
         >
           Start voting
@@ -102,20 +104,35 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
       </div>
 
       <section className="mt-8">
-        <h2 className="text-lg font-semibold mb-3">Add items</h2>
-        <ItemPicker onAdd={(item) => addItem(list.id, item)} onOpenEditor={openNew} />
-      </section>
-
-      <section className="mt-8">
-        <h2 className="text-lg font-semibold mb-3">Items</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Items</h2>
+          <button
+            type="button"
+            onClick={openNew}
+            className="rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
+          >
+            + Add item
+          </button>
+        </div>
         {list.items.length === 0 ? (
-          <p className="text-sm text-foreground/60">No items yet.</p>
+          <div className="rounded-lg border border-dashed border-black/20 dark:border-white/20 p-8 text-center">
+            <p className="text-sm text-foreground/70">
+              No items yet. Add at least two to start voting.
+            </p>
+            <button
+              type="button"
+              onClick={openNew}
+              className="mt-3 rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
+            >
+              + Add your first item
+            </button>
+          </div>
         ) : (
           <ul className="grid gap-2">
             {list.items.map((item) => (
               <li
                 key={item.id}
-                className="group flex items-center gap-3 rounded-md border border-black/10 dark:border-white/10 p-2"
+                className="flex items-center gap-3 rounded-md border border-black/10 dark:border-white/10 p-2"
               >
                 <ItemThumb item={item} />
                 <div className="flex-1 min-w-0">
@@ -136,18 +153,22 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                <div className="flex gap-1">
                   <button
                     type="button"
                     onClick={() => openEdit(item)}
-                    className="text-xs px-2 py-1 rounded hover:bg-foreground/5"
+                    className="text-xs px-2 py-1 rounded border border-foreground/20 hover:bg-foreground/5"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
-                    onClick={() => removeItem(list.id, item.id)}
-                    className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    onClick={() => {
+                      if (confirm(`Remove "${item.title}"?`)) {
+                        removeItem(list.id, item.id);
+                      }
+                    }}
+                    className="text-xs px-2 py-1 rounded border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
                   >
                     Remove
                   </button>
