@@ -20,8 +20,24 @@ export function Leaderboard({ items, rankings, scoreLabel, onItemClick }: Props)
         return (
           <li
             key={r.itemId}
-            className="flex items-center gap-2 sm:gap-3 rounded-lg border border-black/10 dark:border-white/10 p-2.5 sm:p-3"
+            role={onItemClick ? 'button' : undefined}
+            tabIndex={onItemClick ? 0 : undefined}
             onClick={onItemClick ? () => onItemClick(r.itemId) : undefined}
+            onKeyDown={
+              onItemClick
+                ? (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onItemClick(r.itemId);
+                    }
+                  }
+                : undefined
+            }
+            className={`flex items-center gap-2 sm:gap-3 rounded-lg border border-black/10 dark:border-white/10 p-2.5 sm:p-3 ${
+              onItemClick
+                ? 'cursor-pointer hover:border-foreground/40 transition'
+                : ''
+            }`}
           >
             <div className="w-6 sm:w-8 text-right font-mono text-foreground/60 text-sm shrink-0">
               #{r.rank}

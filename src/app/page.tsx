@@ -16,7 +16,7 @@ type OwnerFilter = 'all' | 'mine' | 'shared';
 export default function HomePage() {
   const lists = useStore((s) => s.lists);
   const order = useStore((s) => s.order);
-  const deleteList = useStore((s) => s.deleteList);
+  const archiveList = useStore((s) => s.archiveList);
   const duplicateList = useStore((s) => s.duplicateList);
   const importList = useStore((s) => s.importList);
   const currentUserId = useCurrentUserId();
@@ -303,16 +303,14 @@ export default function HomePage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (confirm(`Delete "${list.title}"?`)) {
-                            deleteList(list.id);
-                            toast.push(`Deleted "${list.title}"`, {
-                              kind: 'info',
-                            });
-                          }
+                          archiveList(list.id);
+                          toast.push(`Archived "${list.title}"`, {
+                            kind: 'info',
+                          });
                         }}
-                        className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
+                        className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
                       >
-                        Delete
+                        Archive
                       </button>
                     )}
                   </div>

@@ -22,6 +22,7 @@ export type ListRow = {
   tier_assignments: Record<string, Tier>;
   direct_ratings: Record<string, number>;
   bracket: Bracket | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -73,6 +74,7 @@ export function listFromRow(
     tierAssignments: row.tier_assignments ?? {},
     directRatings: row.direct_ratings ?? {},
     bracket: row.bracket ?? null,
+    archivedAt: row.archived_at ? new Date(row.archived_at).getTime() : null,
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: new Date(row.updated_at).getTime(),
   };

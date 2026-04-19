@@ -27,18 +27,23 @@ export async function getCurrentUserId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
-/** Fetch lists owned by the current user or that they're a member of. */
-export async function fetchAllLists(): Promise<RankList[]> {
+/** Fetch lists owned by the current user or that they're a member of.
+ *  Archived lists are excluded by default — pass includeArchived=true for the /archived view. */
+export async function fetchAllLists(
+  { includeArchived = false }: { includeArchived?: boolean } = {},
+): Promise<RankList[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
   const supabase = getBrowserClient();
 
+  const ownQuery = supabase
+    .from('lists')
+    .select('*')
+    .eq('owner_id', userId)
+    .order('updated_at', { ascending: false });
+  if (!includeArchived) ownQuery.is('archived_at', null);
   const [ownRes, memberRes] = await Promise.all([
-    supabase
-      .from('lists')
-      .select('*')
-      .eq('owner_id', userId)
-      .order('updated_at', { ascending: false }),
+    ownQuery,
     supabase
       .from('list_members')
       .select('list:lists(*)')
@@ -55,7 +60,9 @@ export async function fetchAllLists(): Promise<RankList[]> {
     // Supabase-js with no typed schema can type embedded joins as either
     // a single row or an array depending on the cardinality; normalize.
     const listObj = Array.isArray(row.list) ? row.list[0] ?? null : row.list;
-    if (listObj && !byId.has(listObj.id)) byId.set(listObj.id, listObj);
+    if (!listObj) continue;
+    if (!includeArchived && listObj.archived_at) continue;
+    if (!byId.has(listObj.id)) byId.set(listObj.id, listObj);
   }
   const listRows = Array.from(byId.values()).sort(
     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
@@ -206,6 +213,24 @@ export async function updateListFields(
 export async function deleteList(listId: string): Promise<void> {
   const supabase = getBrowserClient();
   const { error } = await supabase.from('lists').delete().eq('id', listId);
+  if (error) throw error;
+}
+
+export async function archiveList(listId: string): Promise<void> {
+  const supabase = getBrowserClient();
+  const { error } = await supabase
+    .from('lists')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', listId);
+  if (error) throw error;
+}
+
+export async function restoreList(listId: string): Promise<void> {
+  const supabase = getBrowserClient();
+  const { error } = await supabase
+    .from('lists')
+    .update({ archived_at: null })
+    .eq('id', listId);
   if (error) throw error;
 }
 

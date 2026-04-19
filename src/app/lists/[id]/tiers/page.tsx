@@ -1,11 +1,13 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { TIERS, type Tier, type Item } from '@/lib/types';
 import { useToast } from '@/components/Toaster';
 import { ModeSwitcher } from '@/components/ModeSwitcher';
+
+const DRAG_MIME = 'application/x-pairywise-item';
 
 type Params = { id: string };
 
@@ -66,8 +68,8 @@ export default function TiersPage({ params }: { params: Promise<Params> }) {
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Tier list</h1>
           <p className="text-sm text-foreground/60 mt-1">
             {list.items.length === 0
-              ? 'Add items to the list, then tap to place them.'
-              : `Tap an item to change its tier. ${placed} / ${list.items.length} placed.`}
+              ? 'Add items to the list, then drag or tap to place them.'
+              : `Drag or tap an item to change its tier. ${placed} / ${list.items.length} placed.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -103,26 +105,11 @@ export default function TiersPage({ params }: { params: Promise<Params> }) {
         ))}
       </div>
 
-      <section className="mt-6">
-        <h2 className="text-sm font-medium mb-2 text-foreground/70">
-          Unranked ({byTier.unranked.length})
-        </h2>
-        {byTier.unranked.length === 0 ? (
-          <p className="text-xs text-foreground/50">
-            Everything is placed. Nice work.
-          </p>
-        ) : (
-          <ul className="flex flex-wrap gap-1.5">
-            {byTier.unranked.map((item) => (
-              <ItemChip
-                key={item.id}
-                item={item}
-                onChange={(next) => setTier(list.id, item.id, next)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+      <UnrankedSection
+        items={byTier.unranked}
+        onDropUnrank={(itemId) => setTier(list.id, itemId, null)}
+        onChange={(itemId, next) => setTier(list.id, itemId, next)}
+      />
     </div>
     </>
   );
@@ -137,8 +124,31 @@ function TierRow({
   items: Item[];
   onChange: (itemId: string, next: Tier | null) => void;
 }) {
+  const [over, setOver] = useState(false);
   return (
-    <div className="flex items-stretch rounded-md border border-black/10 dark:border-white/10 overflow-hidden">
+    <div
+      className={`flex items-stretch rounded-md border overflow-hidden transition-colors ${
+        over
+          ? 'border-foreground shadow-[0_0_0_2px_var(--tw-ring-color)] ring-foreground/20'
+          : 'border-black/10 dark:border-white/10'
+      }`}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(DRAG_MIME)) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (!over) setOver(true);
+        }
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        const id = e.dataTransfer.getData(DRAG_MIME);
+        if (id) {
+          e.preventDefault();
+          onChange(id, tier);
+        }
+        setOver(false);
+      }}
+    >
       <div
         className={`flex items-center justify-center w-12 sm:w-14 font-bold text-xl ${TIER_COLORS[tier]}`}
       >
@@ -146,7 +156,9 @@ function TierRow({
       </div>
       <ul className="flex-1 p-2 flex flex-wrap gap-1.5 min-h-[56px] bg-foreground/5">
         {items.length === 0 ? (
-          <li className="text-xs text-foreground/50 self-center">Drop items here</li>
+          <li className="text-xs text-foreground/50 self-center">
+            Drag or tap items here
+          </li>
         ) : (
           items.map((item) => (
             <ItemChip key={item.id} item={item} onChange={(next) => onChange(item.id, next)} />
@@ -154,6 +166,60 @@ function TierRow({
         )}
       </ul>
     </div>
+  );
+}
+
+function UnrankedSection({
+  items,
+  onDropUnrank,
+  onChange,
+}: {
+  items: Item[];
+  onDropUnrank: (itemId: string) => void;
+  onChange: (itemId: string, next: Tier | null) => void;
+}) {
+  const [over, setOver] = useState(false);
+  return (
+    <section
+      className={`mt-6 rounded-md border border-dashed transition-colors p-3 ${
+        over ? 'border-foreground bg-foreground/5' : 'border-foreground/20'
+      }`}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(DRAG_MIME)) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (!over) setOver(true);
+        }
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        const id = e.dataTransfer.getData(DRAG_MIME);
+        if (id) {
+          e.preventDefault();
+          onDropUnrank(id);
+        }
+        setOver(false);
+      }}
+    >
+      <h2 className="text-sm font-medium mb-2 text-foreground/70">
+        Unranked ({items.length})
+      </h2>
+      {items.length === 0 ? (
+        <p className="text-xs text-foreground/50">
+          Everything is placed. Drag anything back here to unrank it.
+        </p>
+      ) : (
+        <ul className="flex flex-wrap gap-1.5">
+          {items.map((item) => (
+            <ItemChip
+              key={item.id}
+              item={item}
+              onChange={(next) => onChange(item.id, next)}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -168,8 +234,13 @@ function ItemChip({
     <li className="relative group">
       <details className="list-none">
         <summary
-          className="cursor-pointer list-none text-xs rounded-md bg-background border border-foreground/20 px-2 py-1 flex items-center gap-1.5 hover:border-foreground/40"
-          aria-label={`${item.title} — change tier`}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(DRAG_MIME, item.id);
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          className="cursor-grab active:cursor-grabbing list-none text-xs rounded-md bg-background border border-foreground/20 px-2 py-1 flex items-center gap-1.5 hover:border-foreground/40"
+          aria-label={`${item.title} — drag to a tier or tap to pick one`}
         >
           {item.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element

@@ -7,11 +7,13 @@ import { AlgorithmToggle } from '@/components/AlgorithmToggle';
 import { Leaderboard } from '@/components/Leaderboard';
 import { RatingHistoryChart } from '@/components/RatingHistoryChart';
 import { HardestChoices } from '@/components/HardestChoices';
+import { HeadToHeadDialog } from '@/components/HeadToHeadDialog';
 import { useStore } from '@/lib/store';
 
 export function PairwiseResults({ list }: { list: RankList }) {
   const setAlgorithmDefault = useStore((s) => s.setAlgorithmDefault);
   const [algorithm, setAlgorithm] = useState<Algorithm>(list.algorithmDefault ?? 'elo');
+  const [h2hItemId, setH2hItemId] = useState<string | null>(null);
 
   const rankings = useMemo(
     () => rank(algorithm, list.items, list.comparisons),
@@ -53,6 +55,15 @@ export function PairwiseResults({ list }: { list: RankList }) {
         items={list.items}
         rankings={rankings}
         scoreLabel={algorithm === 'elo' ? 'ELO' : 'log-strength'}
+        onItemClick={(id) => setH2hItemId(id)}
+      />
+      <p className="mt-2 text-xs text-foreground/50">
+        Tap any row for the head-to-head record.
+      </p>
+      <HeadToHeadDialog
+        list={list}
+        itemId={h2hItemId}
+        onClose={() => setH2hItemId(null)}
       />
       <div className="mt-6">
         <RatingHistoryChart items={list.items} rankings={eloRankings} />

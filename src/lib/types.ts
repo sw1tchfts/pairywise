@@ -73,6 +73,7 @@ export const ListSchema = z.object({
   tierAssignments: z.record(z.string(), TierSchema).default({}),
   directRatings: z.record(z.string(), z.number()).default({}),
   bracket: BracketSchema.nullable().default(null),
+  archivedAt: z.number().nullable().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });

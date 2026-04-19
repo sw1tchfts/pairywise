@@ -2,11 +2,22 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { Item, RankList } from '@/lib/types';
+import type { Comparison, Item, RankList } from '@/lib/types';
 import { nextPair, comparisonsRemaining, rankElo } from '@/lib/ranking';
 import { useStore } from '@/lib/store';
 import { VoteCard } from './VoteCard';
 import { useToast } from './Toaster';
+
+const TIP_KEY = 'pairywise-voted-before';
+
+type LastVote = {
+  winnerId: string;
+  winnerTitle: string;
+  winnerDelta: number;
+  loserId: string;
+  loserTitle: string;
+  loserDelta: number;
+};
 
 type Props = { list: RankList };
 
@@ -17,11 +28,30 @@ export function VoteScreen({ list }: Props) {
   const toast = useToast();
 
   const [nonce, setNonce] = useState(0);
+  const [lastVote, setLastVote] = useState<LastVote | null>(null);
+  const [showTip, setShowTip] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(TIP_KEY) !== '1';
+  });
 
   const ratingsById = useMemo(() => {
     const rs = rankElo(list.items, list.comparisons);
     return new Map(rs.map((r) => [r.itemId, r.rating]));
   }, [list.items, list.comparisons]);
+
+  const top5 = useMemo(() => {
+    const rs = rankElo(list.items, list.comparisons);
+    return rs.slice(0, 5);
+  }, [list.items, list.comparisons]);
+  const itemById = useMemo(
+    () => new Map(list.items.map((i) => [i.id, i])),
+    [list.items],
+  );
+
+  function dismissTip() {
+    if (typeof window !== 'undefined') localStorage.setItem(TIP_KEY, '1');
+    setShowTip(false);
+  }
 
   const pair = useMemo(() => {
     return nextPair(list.items, list.comparisons, {
@@ -34,8 +64,31 @@ export function VoteScreen({ list }: Props) {
   const remaining = comparisonsRemaining(list.items, list.comparisons);
 
   function vote(winner: Item, loser: Item) {
+    // Capture before/after ratings so we can show the delta.
+    const before = ratingsById;
+    const hypothetical: Comparison = {
+      id: 'preview',
+      winnerId: winner.id,
+      loserId: loser.id,
+      createdAt: Date.now(),
+    };
+    const afterRankings = rankElo(list.items, [...list.comparisons, hypothetical]);
+    const after = new Map(afterRankings.map((r) => [r.itemId, r.rating]));
+    const wBefore = before.get(winner.id) ?? 1500;
+    const lBefore = before.get(loser.id) ?? 1500;
+    const wAfter = after.get(winner.id) ?? wBefore;
+    const lAfter = after.get(loser.id) ?? lBefore;
+    setLastVote({
+      winnerId: winner.id,
+      winnerTitle: winner.title,
+      winnerDelta: wAfter - wBefore,
+      loserId: loser.id,
+      loserTitle: loser.title,
+      loserDelta: lAfter - lBefore,
+    });
     recordComparison(list.id, winner.id, loser.id);
     setNonce((n) => n + 1);
+    if (showTip) dismissTip();
   }
 
   function skip() {
@@ -192,6 +245,27 @@ export function VoteScreen({ list }: Props) {
         Tip: swipe right to pick the top card, left for the bottom
       </p>
 
+      {lastVote && (
+        <div
+          key={nonce}
+          className="mt-4 text-center text-sm animate-[fadein_0.3s_ease]"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="text-green-600 dark:text-green-400 font-medium">
+            {lastVote.winnerTitle}
+          </span>{' '}
+          <span className="font-mono">
+            {formatDelta(lastVote.winnerDelta)}
+          </span>
+          <span className="text-foreground/40 mx-2">·</span>
+          <span className="text-foreground/70">{lastVote.loserTitle}</span>{' '}
+          <span className="font-mono text-foreground/60">
+            {formatDelta(lastVote.loserDelta)}
+          </span>
+        </div>
+      )}
+
       <div className="mt-6 flex items-center justify-center gap-3 text-sm">
         <button
           type="button"
@@ -215,8 +289,63 @@ export function VoteScreen({ list }: Props) {
           </kbd>
         </button>
       </div>
+
+      {list.comparisons.length > 0 && (
+        <section className="mt-8 rounded-lg border border-foreground/10 bg-foreground/5 p-3">
+          <h2 className="text-xs uppercase tracking-wider text-foreground/60 mb-2">
+            Leading so far
+          </h2>
+          <ol className="grid gap-1 text-sm">
+            {top5.map((r, i) => {
+              const item = itemById.get(r.itemId);
+              if (!item) return null;
+              return (
+                <li
+                  key={r.itemId}
+                  className="flex items-center gap-2 px-1"
+                >
+                  <span className="w-5 text-right text-foreground/50 tabular-nums">
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 min-w-0 truncate">{item.title}</span>
+                  <span className="font-mono text-xs text-foreground/60 tabular-nums">
+                    {Math.round(r.rating)}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      {showTip && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-sm w-[calc(100%-2rem)]">
+          <div className="rounded-lg bg-foreground text-background shadow-xl p-4">
+            <p className="font-medium text-sm">How voting works</p>
+            <p className="text-xs opacity-80 mt-1">
+              Tap a card to pick it. On desktop, use ← / → arrow keys; on
+              mobile, swipe. Press U to undo.
+            </p>
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={dismissTip}
+                className="rounded-md bg-background text-foreground px-3 py-1 text-xs font-medium hover:opacity-90"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function formatDelta(d: number) {
+  const n = Math.round(d);
+  if (n > 0) return `+${n}`;
+  return `${n}`;
 }
 
 function SwipeArea({

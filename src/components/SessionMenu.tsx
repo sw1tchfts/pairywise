@@ -72,6 +72,12 @@ export function SessionMenu() {
         >
           Profile
         </Link>
+        <Link
+          href="/archived"
+          className="block px-3 py-2 rounded hover:bg-foreground/5"
+        >
+          Archived lists
+        </Link>
         <button
           type="button"
           onClick={signOut}

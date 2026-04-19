@@ -32,6 +32,8 @@ type Actions = {
     visibility?: Visibility;
   }) => string;
   deleteList: (id: string) => void;
+  archiveList: (id: string) => void;
+  restoreList: (id: string) => void;
   duplicateList: (id: string) => string | null;
   updateList: (
     id: string,
@@ -123,6 +125,24 @@ export const useStore = create<State & Actions>()((set, get) => ({
       return { lists: rest, order: s.order.filter((x) => x !== id) };
     });
     api.deleteList(id).catch((e) => reportCloudError('deleteList', e));
+  },
+
+  archiveList: (id) => {
+    set((s) => {
+      const rest = { ...s.lists };
+      delete rest[id];
+      return { lists: rest, order: s.order.filter((x) => x !== id) };
+    });
+    api.archiveList(id).catch((e) => reportCloudError('archiveList', e));
+  },
+
+  restoreList: (id) => {
+    // Local state only tracks active lists; on restore we trigger a fresh hydrate
+    // so the restored list reappears at the top.
+    api
+      .restoreList(id)
+      .then(() => get().hydrate())
+      .catch((e) => reportCloudError('restoreList', e));
   },
 
   duplicateList: (id) => {
