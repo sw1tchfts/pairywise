@@ -5,6 +5,7 @@ import Link from 'next/link';
 import * as api from '@/lib/cloud/api';
 import { useToast } from '@/components/Toaster';
 import { invalidateProfile } from '@/lib/cloud/useProfiles';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -118,6 +119,14 @@ export default function ProfilePage() {
           </button>
         </div>
       </form>
+
+      <section className="mt-10 pt-6 border-t border-foreground/10">
+        <h2 className="text-lg font-semibold">Appearance</h2>
+        <p className="text-sm text-foreground/60 mt-1 mb-3">
+          Pick your theme. &quot;Auto&quot; follows your OS setting.
+        </p>
+        <ThemeToggle />
+      </section>
     </div>
   );
 }

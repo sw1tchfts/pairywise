@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { Toaster } from "@/components/Toaster";
 import { SessionMenu } from "@/components/SessionMenu";
 import { HeaderActions } from "@/components/HeaderActions";
@@ -67,7 +66,6 @@ function HeaderAndMain({ children }: { children: React.ReactNode }) {
             pairywise
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3 text-sm text-foreground/70">
-            <ThemeToggle />
             <SessionMenu />
             <HeaderActions />
           </nav>
