@@ -8,6 +8,7 @@ import { PairwiseResults } from '@/components/results/PairwiseResults';
 import { TierResults } from '@/components/results/TierResults';
 import { RateResults } from '@/components/results/RateResults';
 import { BracketResults } from '@/components/results/BracketResults';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 
 type Params = { id: string };
 
@@ -40,15 +41,14 @@ export default function ResultsPage({ params }: { params: Promise<Params> }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
-      <div className="mb-2 text-sm">
-        <Link
-          href={`/lists/${id}`}
-          className="text-foreground/60 hover:text-foreground truncate block"
-        >
-          ← {list.title}
-        </Link>
-      </div>
+    <>
+      <ModeSwitcher
+        listId={list.id}
+        listTitle={list.title}
+        current="results"
+        itemCount={list.items.length}
+      />
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-5">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
@@ -58,6 +58,14 @@ export default function ResultsPage({ params }: { params: Promise<Params> }) {
             {list.items.length} items
           </p>
         </div>
+        <a
+          href={`/api/share-card?listId=${list.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
+        >
+          Share as image ↗
+        </a>
       </div>
 
       <nav
@@ -89,5 +97,6 @@ export default function ResultsPage({ params }: { params: Promise<Params> }) {
         {tab === 'bracket' && <BracketResults list={list} />}
       </div>
     </div>
+    </>
   );
 }

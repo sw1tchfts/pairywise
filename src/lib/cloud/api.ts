@@ -284,6 +284,58 @@ export async function deleteItem(itemId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ---------- Profiles ----------
+
+export type Profile = {
+  userId: string;
+  handle: string | null;
+  displayName: string | null;
+};
+
+type ProfileRow = {
+  user_id: string;
+  handle: string | null;
+  display_name: string | null;
+};
+
+export async function fetchProfiles(userIds: string[]): Promise<Profile[]> {
+  if (userIds.length === 0) return [];
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('user_id, handle, display_name')
+    .in('user_id', userIds);
+  if (error) throw error;
+  return (data ?? []).map((r) => {
+    const row = r as ProfileRow;
+    return { userId: row.user_id, handle: row.handle, displayName: row.display_name };
+  });
+}
+
+export async function fetchCurrentProfile(): Promise<Profile | null> {
+  const userId = await getCurrentUserId();
+  if (!userId) return null;
+  const [profile] = await fetchProfiles([userId]);
+  return profile ?? { userId, handle: null, displayName: null };
+}
+
+export async function updateCurrentProfile(patch: {
+  handle?: string | null;
+  displayName?: string | null;
+}): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated.');
+  const supabase = getBrowserClient();
+  const update: Record<string, unknown> = {};
+  if ('handle' in patch) update.handle = patch.handle;
+  if ('displayName' in patch) update.display_name = patch.displayName;
+  const { error } = await supabase
+    .from('profiles')
+    .update(update)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 // ---------- Comparisons ----------
 
 export async function insertComparison(

@@ -8,6 +8,7 @@ import type { Item } from '@/lib/types';
 import { ItemEditor } from '@/components/ItemEditor';
 import { ShareDialog } from '@/components/ShareDialog';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
+import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useToast } from '@/components/Toaster';
 
 type Params = { id: string };
@@ -30,6 +31,8 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const [shareOpen, setShareOpen] = useState(false);
   const [moreModesOpen, setMoreModesOpen] = useState(false);
   const currentUserId = useCurrentUserId();
+  const ownerIds = list?.ownerId ? [list.ownerId] : [];
+  const profiles = useProfiles(ownerIds);
 
   useEffect(() => {
     if (shouldAutoOpen && !autoOpenedRef.current) {
@@ -109,7 +112,9 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         </h1>
         {!ownedByMe && (
           <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/70 font-semibold">
-            Shared with you
+            {list.ownerId
+              ? `Shared by ${profileLabel(profiles.get(list.ownerId), list.ownerId)}`
+              : 'Shared with you'}
           </span>
         )}
       </div>

@@ -4,6 +4,7 @@ import { use } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { VoteScreen } from '@/components/VoteScreen';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 
 type Params = { id: string };
 
@@ -22,5 +23,15 @@ export default function VotePage({ params }: { params: Promise<Params> }) {
     );
   }
 
-  return <VoteScreen list={list} />;
+  return (
+    <>
+      <ModeSwitcher
+        listId={list.id}
+        listTitle={list.title}
+        current="vote"
+        itemCount={list.items.length}
+      />
+      <VoteScreen list={list} />
+    </>
+  );
 }

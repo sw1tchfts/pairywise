@@ -66,6 +66,12 @@ export function SessionMenu() {
       <div className="absolute right-0 mt-2 z-30 min-w-[200px] rounded-md border border-foreground/15 bg-background shadow-lg p-1 text-sm">
         <div className="px-3 py-2 text-xs text-foreground/60 truncate">{email}</div>
         <div className="h-px bg-foreground/10" />
+        <Link
+          href="/profile"
+          className="block px-3 py-2 rounded hover:bg-foreground/5"
+        >
+          Profile
+        </Link>
         <button
           type="button"
           onClick={signOut}

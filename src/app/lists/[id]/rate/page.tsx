@@ -4,6 +4,7 @@ import { use, useMemo } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toaster';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 import type { Item } from '@/lib/types';
 
 type Params = { id: string };
@@ -41,17 +42,21 @@ export default function RatePage({ params }: { params: Promise<Params> }) {
   const rated = Object.keys(ratings).length;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 sm:px-6 py-8 sm:py-10">
-      <div className="text-sm mb-2">
-        <Link href={`/lists/${list.id}`} className="text-foreground/60 hover:text-foreground">
-          ← {list.title}
-        </Link>
-      </div>
+    <>
+      <ModeSwitcher
+        listId={list.id}
+        listTitle={list.title}
+        current="rate"
+        itemCount={list.items.length}
+      />
+    <div className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-8">
       <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Rate 1–10</h1>
           <p className="text-sm text-foreground/60 mt-1">
-            Give each item a number. Sorted live by score. {rated} / {list.items.length} rated.
+            {list.items.length === 0
+              ? 'Add items to the list, then drag each slider to score it.'
+              : `Drag to score each item. Sorted live. ${rated} / ${list.items.length} rated.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -130,5 +135,6 @@ export default function RatePage({ params }: { params: Promise<Params> }) {
         </ul>
       )}
     </div>
+    </>
   );
 }

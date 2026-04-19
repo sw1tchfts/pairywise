@@ -4,6 +4,7 @@ import { use, useMemo } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toaster';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 import type { BracketMatch, Item } from '@/lib/types';
 
 type Params = { id: string };
@@ -36,36 +37,36 @@ export default function BracketPage({ params }: { params: Promise<Params> }) {
 
   if (!bracket) {
     return (
-      <div className="mx-auto max-w-xl px-4 sm:px-6 py-10 text-center">
-        <div className="text-sm mb-2">
-          <Link
-            href={`/lists/${list.id}`}
-            className="text-foreground/60 hover:text-foreground"
+      <>
+        <ModeSwitcher
+          listId={list.id}
+          listTitle={list.title}
+          current="bracket"
+          itemCount={list.items.length}
+        />
+        <div className="mx-auto max-w-xl px-4 sm:px-6 py-10 text-center">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Tournament</h1>
+          <p className="mt-2 text-foreground/70 text-sm">
+            Single-elimination bracket. Random seed, byes fill the first round if
+            needed.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (list.items.length < 2) {
+                toast.push('Add at least 2 items first.', { kind: 'error' });
+                return;
+              }
+              initBracket(list.id);
+              toast.push('Bracket seeded');
+            }}
+            className="mt-6 rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
+            disabled={list.items.length < 2}
           >
-            ← {list.title}
-          </Link>
+            Start tournament
+          </button>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Tournament</h1>
-        <p className="mt-2 text-foreground/70 text-sm">
-          Single-elimination bracket. Random seed, byes fill the first round if
-          needed.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            if (list.items.length < 2) {
-              toast.push('Add at least 2 items first.', { kind: 'error' });
-              return;
-            }
-            initBracket(list.id);
-            toast.push('Bracket seeded');
-          }}
-          className="mt-6 rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
-          disabled={list.items.length < 2}
-        >
-          Start tournament
-        </button>
-      </div>
+      </>
     );
   }
 
@@ -74,12 +75,14 @@ export default function BracketPage({ params }: { params: Promise<Params> }) {
   const activeRound = findActiveRound(bracket.matches);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-10">
-      <div className="text-sm mb-2">
-        <Link href={`/lists/${list.id}`} className="text-foreground/60 hover:text-foreground">
-          ← {list.title}
-        </Link>
-      </div>
+    <>
+      <ModeSwitcher
+        listId={list.id}
+        listTitle={list.title}
+        current="bracket"
+        itemCount={list.items.length}
+      />
+    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-6 sm:py-8">
       <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
@@ -135,6 +138,7 @@ export default function BracketPage({ params }: { params: Promise<Params> }) {
         ))}
       </div>
     </div>
+    </>
   );
 }
 

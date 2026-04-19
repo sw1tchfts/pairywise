@@ -143,13 +143,7 @@ export function VoteScreen({ list }: Props) {
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-8">
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/lists/${list.id}`}
-            className="text-sm text-foreground/60 hover:text-foreground truncate block"
-          >
-            ← {list.title}
-          </Link>
-          <h1 className="text-xl sm:text-2xl font-semibold mt-1">
+          <h1 className="text-xl sm:text-2xl font-semibold">
             Which do you prefer?
           </h1>
         </div>

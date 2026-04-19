@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { TIERS, type Tier, type Item } from '@/lib/types';
 import { useToast } from '@/components/Toaster';
+import { ModeSwitcher } from '@/components/ModeSwitcher';
 
 type Params = { id: string };
 
@@ -52,17 +53,21 @@ export default function TiersPage({ params }: { params: Promise<Params> }) {
   const placed = list.items.length - byTier.unranked.length;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
-      <div className="text-sm mb-2">
-        <Link href={`/lists/${list.id}`} className="text-foreground/60 hover:text-foreground">
-          ← {list.title}
-        </Link>
-      </div>
+    <>
+      <ModeSwitcher
+        listId={list.id}
+        listTitle={list.title}
+        current="tiers"
+        itemCount={list.items.length}
+      />
+    <div className="mx-auto max-w-3xl px-4 sm:px-6 py-6 sm:py-8">
       <div className="flex items-start justify-between gap-3 flex-wrap mb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Tier list</h1>
           <p className="text-sm text-foreground/60 mt-1">
-            Tap an item to change its tier. {placed} / {list.items.length} placed.
+            {list.items.length === 0
+              ? 'Add items to the list, then tap to place them.'
+              : `Tap an item to change its tier. ${placed} / ${list.items.length} placed.`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -119,6 +124,7 @@ export default function TiersPage({ params }: { params: Promise<Params> }) {
         )}
       </section>
     </div>
+    </>
   );
 }
 

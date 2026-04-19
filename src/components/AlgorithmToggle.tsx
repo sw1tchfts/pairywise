@@ -9,8 +9,8 @@ type Props = {
 
 export function AlgorithmToggle({ value, onChange }: Props) {
   const options: { key: Algorithm; label: string; hint: string }[] = [
-    { key: 'elo', label: 'ELO', hint: 'Fast, partial-data friendly' },
-    { key: 'bradleyTerry', label: 'Bradley-Terry', hint: 'Full MLE, rigorous' },
+    { key: 'elo', label: 'Fast', hint: 'ELO · live updates, forgiving on partial data' },
+    { key: 'bradleyTerry', label: 'Rigorous', hint: 'Bradley-Terry · recomputes strengths from every vote' },
   ];
   return (
     <div className="inline-flex items-center rounded-lg border border-black/10 dark:border-white/10 p-0.5 bg-foreground/5">
