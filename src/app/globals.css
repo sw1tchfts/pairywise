@@ -1,8 +1,23 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+/* When no explicit class is set, follow the OS preference. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
 @theme inline {
@@ -10,13 +25,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -38,11 +46,17 @@ body {
   outline: 2px solid rgb(0 0 0 / 0.8);
   outline-offset: -1px;
 }
+.dark .input {
+  border-color: rgb(255 255 255 / 0.15);
+}
+.dark .input:focus {
+  outline-color: rgb(255 255 255 / 0.8);
+}
 @media (prefers-color-scheme: dark) {
-  .input {
+  :root:not(.light) .input {
     border-color: rgb(255 255 255 / 0.15);
   }
-  .input:focus {
+  :root:not(.light) .input:focus {
     outline-color: rgb(255 255 255 / 0.8);
   }
 }

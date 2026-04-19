@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Item, RankList } from '@/lib/types';
 import { nextPair, comparisonsRemaining, rankElo } from '@/lib/ranking';
 import { useStore } from '@/lib/store';
 import { VoteCard } from './VoteCard';
+import { useToast } from './Toaster';
 
 type Props = { list: RankList };
 
@@ -13,6 +14,7 @@ export function VoteScreen({ list }: Props) {
   const recordComparison = useStore((s) => s.recordComparison);
   const skipPair = useStore((s) => s.skipPair);
   const undoLastComparison = useStore((s) => s.undoLastComparison);
+  const toast = useToast();
 
   const [nonce, setNonce] = useState(0);
 
@@ -43,8 +45,11 @@ export function VoteScreen({ list }: Props) {
   }
 
   function undo() {
-    undoLastComparison(list.id);
+    const removed = undoLastComparison(list.id);
     setNonce((n) => n + 1);
+    if (removed) {
+      toast.push(removed.skipped ? 'Skip undone' : 'Vote undone');
+    }
   }
 
   useEffect(() => {
@@ -180,10 +185,18 @@ export function VoteScreen({ list }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-        <VoteCard item={pair[0]} onSelect={() => vote(pair[0], pair[1])} hotkeyLabel="←" />
-        <VoteCard item={pair[1]} onSelect={() => vote(pair[1], pair[0])} hotkeyLabel="→" />
-      </div>
+      <SwipeArea
+        onSwipeLeft={() => vote(pair[1], pair[0])}
+        onSwipeRight={() => vote(pair[0], pair[1])}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          <VoteCard item={pair[0]} onSelect={() => vote(pair[0], pair[1])} hotkeyLabel="←" />
+          <VoteCard item={pair[1]} onSelect={() => vote(pair[1], pair[0])} hotkeyLabel="→" />
+        </div>
+      </SwipeArea>
+      <p className="mt-3 text-center text-xs text-foreground/50 md:hidden">
+        Tip: swipe right to pick the top card, left for the bottom
+      </p>
 
       <div className="mt-6 flex items-center justify-center gap-3 text-sm">
         <button
@@ -208,6 +221,55 @@ export function VoteScreen({ list }: Props) {
           </kbd>
         </button>
       </div>
+    </div>
+  );
+}
+
+function SwipeArea({
+  children,
+  onSwipeLeft,
+  onSwipeRight,
+}: {
+  children: React.ReactNode;
+  onSwipeLeft: () => void;
+  onSwipeRight: () => void;
+}) {
+  const startX = useRef<number | null>(null);
+  const startY = useRef<number | null>(null);
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType !== 'touch') return;
+    const el = e.target as HTMLElement | null;
+    if (el && el.closest('video, audio, a')) return;
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    if (e.pointerType !== 'touch') return;
+    if (startX.current === null || startY.current === null) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    startX.current = null;
+    startY.current = null;
+    const THRESHOLD = 60;
+    if (Math.abs(dx) > THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      if (dx > 0) onSwipeRight();
+      else onSwipeLeft();
+    }
+  }
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        startX.current = null;
+        startY.current = null;
+      }}
+      className="touch-pan-y"
+    >
+      {children}
     </div>
   );
 }

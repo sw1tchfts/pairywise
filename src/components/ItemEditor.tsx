@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { Item } from '@/lib/types';
 import { UrlPreviewInput } from './UrlPreviewInput';
 import { TmdbSearchInput } from './TmdbSearchInput';
+import { TagInput } from './TagInput';
+import { VoteCard } from './VoteCard';
 
 type Props = {
   open: boolean;
@@ -43,10 +45,8 @@ function ItemEditorForm({
     tags: initial?.tags ?? [],
     title: initial?.title ?? '',
   }));
-  const [tagsInput, setTagsInput] = useState(() =>
-    (initial?.tags ?? []).join(', '),
-  );
   const [importMode, setImportMode] = useState<'none' | 'url' | 'tmdb'>('none');
+  const [showPreview, setShowPreview] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   function handleImport(patch: Partial<Omit<Item, 'id'>>) {
@@ -55,7 +55,6 @@ function ItemEditorForm({
       ...patch,
       tags: patch.tags ?? d.tags,
     }));
-    if (patch.tags) setTagsInput(patch.tags.join(', '));
     setImportMode('none');
     setTimeout(() => titleRef.current?.focus(), 0);
   }
@@ -70,10 +69,6 @@ function ItemEditorForm({
   }, [onClose]);
 
   function commit() {
-    const tags = tagsInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
     onSave({
       ...draft,
       title: draft.title.trim(),
@@ -82,7 +77,7 @@ function ItemEditorForm({
       audioUrl: draft.audioUrl?.trim() || undefined,
       videoUrl: draft.videoUrl?.trim() || undefined,
       linkUrl: draft.linkUrl?.trim() || undefined,
-      tags,
+      tags: draft.tags ?? [],
     });
   }
 
@@ -96,7 +91,6 @@ function ItemEditorForm({
     if (!draft.title.trim()) return;
     commit();
     setDraft({ ...EMPTY });
-    setTagsInput('');
     setTimeout(() => titleRef.current?.focus(), 0);
   }
 
@@ -186,11 +180,10 @@ function ItemEditorForm({
             />
           </Field>
 
-          <Field label="Tags" hint="Comma-separated">
-            <input
-              className="input"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
+          <Field label="Tags" hint="Press Enter or comma to add">
+            <TagInput
+              value={draft.tags ?? []}
+              onChange={(tags) => setDraft((d) => ({ ...d, tags }))}
               placeholder="e.g. drama, classic"
             />
           </Field>
@@ -238,6 +231,39 @@ function ItemEditorForm({
               </Field>
             </div>
           </fieldset>
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowPreview((v) => !v)}
+              className="text-xs text-foreground/60 hover:text-foreground"
+            >
+              {showPreview ? 'Hide preview' : 'Show preview'}
+            </button>
+            {draft.title.trim() && (
+              <span className="text-[11px] text-foreground/50">
+                How your vote card will look
+              </span>
+            )}
+          </div>
+          {showPreview && draft.title.trim() && (
+            <div className="rounded-lg bg-foreground/5 p-3">
+              <VoteCard
+                preview
+                item={{
+                  id: 'preview',
+                  type: draft.type,
+                  title: draft.title.trim() || 'Untitled',
+                  description: draft.description?.trim() || undefined,
+                  tags: draft.tags ?? [],
+                  imageUrl: draft.imageUrl?.trim() || undefined,
+                  audioUrl: draft.audioUrl?.trim() || undefined,
+                  videoUrl: draft.videoUrl?.trim() || undefined,
+                  linkUrl: draft.linkUrl?.trim() || undefined,
+                }}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2 flex-wrap">
             <button

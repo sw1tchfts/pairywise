@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
+import { useToast } from '@/components/Toaster';
 
 export default function HomePage() {
   const lists = useStore((s) => s.lists);
   const order = useStore((s) => s.order);
   const deleteList = useStore((s) => s.deleteList);
   const duplicateList = useStore((s) => s.duplicateList);
+  const toast = useToast();
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10">
@@ -39,7 +41,10 @@ export default function HomePage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => duplicateList(id)}
+                    onClick={() => {
+                      duplicateList(id);
+                      toast.push(`Duplicated "${list.title}"`, { kind: 'success' });
+                    }}
                     className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
                   >
                     Duplicate
@@ -47,7 +52,10 @@ export default function HomePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (confirm(`Delete "${list.title}"?`)) deleteList(id);
+                      if (confirm(`Delete "${list.title}"?`)) {
+                        deleteList(id);
+                        toast.push(`Deleted "${list.title}"`, { kind: 'info' });
+                      }
                     }}
                     className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
                   >

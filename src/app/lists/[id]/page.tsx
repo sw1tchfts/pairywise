@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import type { Item } from '@/lib/types';
 import { ItemEditor } from '@/components/ItemEditor';
+import { useToast } from '@/components/Toaster';
 
 type Params = { id: string };
 
@@ -20,6 +21,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const searchParams = useSearchParams();
   const shouldAutoOpen = searchParams.get('addItem') === '1';
   const autoOpenedRef = useRef(false);
+  const toast = useToast();
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,11 +50,31 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
     if (!list) return;
     if (editingId) {
       updateItem(list.id, editingId, payload);
+      toast.push(`Updated "${payload.title}"`, { kind: 'success' });
     } else {
       addItem(list.id, payload);
+      toast.push(`Added "${payload.title}"`, { kind: 'success' });
     }
     setEditorOpen(false);
     setEditingId(null);
+  }
+
+  function handleRemove(item: Item) {
+    if (!list) return;
+    const removed = item;
+    removeItem(list.id, item.id);
+    toast.push(`Removed "${removed.title}"`, {
+      kind: 'info',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          const { id: _id, ...rest } = removed;
+          void _id;
+          addItem(list.id, rest);
+          toast.push(`Restored "${removed.title}"`);
+        },
+      },
+    });
   }
 
   if (!list) {
@@ -167,11 +189,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm(`Remove "${item.title}"?`)) {
-                        removeItem(list.id, item.id);
-                      }
-                    }}
+                    onClick={() => handleRemove(item)}
                     aria-label={`Remove ${item.title}`}
                     className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
                   >

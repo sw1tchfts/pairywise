@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
+import { TagInput } from '@/components/TagInput';
 
 export default function NewListPage() {
   const router = useRouter();
@@ -10,15 +11,11 @@ export default function NewListPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    const tags = tagsInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
     const id = createList({
       title: title.trim(),
       description: description.trim() || undefined,
@@ -52,12 +49,8 @@ export default function NewListPage() {
             className="input resize-y"
           />
         </Field>
-        <Field label="Tags" hint="Comma-separated, e.g. food, fun">
-          <input
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            className="input"
-          />
+        <Field label="Tags" hint="Press Enter or comma to add">
+          <TagInput value={tags} onChange={setTags} placeholder="e.g. food, fun" />
         </Field>
         <div className="flex items-center justify-end gap-2">
           <button
