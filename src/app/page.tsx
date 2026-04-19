@@ -1,23 +1,65 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toaster';
+import { downloadJSON, exportList, parseImport, slugify } from '@/lib/io';
 
 export default function HomePage() {
   const lists = useStore((s) => s.lists);
   const order = useStore((s) => s.order);
   const deleteList = useStore((s) => s.deleteList);
   const duplicateList = useStore((s) => s.duplicateList);
+  const importList = useStore((s) => s.importList);
   const toast = useToast();
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function handleImportFile(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = parseImport(JSON.parse(text));
+      const newId = importList(parsed);
+      toast.push(`Imported "${parsed.title}"`, { kind: 'success' });
+      return newId;
+    } catch (err) {
+      toast.push(
+        err instanceof Error ? err.message : 'Could not import file.',
+        { kind: 'error' },
+      );
+      return null;
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Your lists</h1>
-        <p className="mt-1 text-foreground/60 text-sm sm:text-base">
-          Create a list of things, vote between pairs, see them ranked.
-        </p>
+      <div className="mb-6 sm:mb-8 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Your lists</h1>
+          <p className="mt-1 text-foreground/60 text-sm sm:text-base">
+            Create a list of things, vote between pairs, see them ranked.
+          </p>
+        </div>
+        <div>
+          <input
+            ref={fileInput}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportFile(file);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
+          >
+            Import JSON
+          </button>
+        </div>
       </div>
       {order.length === 0 ? (
         <EmptyState />
@@ -39,6 +81,16 @@ export default function HomePage() {
                   </div>
                 </Link>
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadJSON(`${slugify(list.title)}.pairywise.json`, exportList(list));
+                      toast.push(`Exported "${list.title}"`);
+                    }}
+                    className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
+                  >
+                    Export
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

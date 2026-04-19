@@ -207,6 +207,8 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         open={editorOpen}
         initial={editing ?? undefined}
         allowAddAnother={!editingId}
+        existing={list.items}
+        editingId={editingId}
         onClose={() => {
           setEditorOpen(false);
           setEditingId(null);

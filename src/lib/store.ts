@@ -22,6 +22,7 @@ type Actions = {
   skipPair: (listId: string, aId: string, bId: string) => void;
   undoLastComparison: (listId: string) => Comparison | null;
   setAlgorithmDefault: (listId: string, algo: Algorithm) => void;
+  importList: (list: RankList) => string;
 };
 
 export const useStore = create<State & Actions>()(
@@ -223,6 +224,41 @@ export const useStore = create<State & Actions>()(
             },
           };
         }),
+
+      importList: (src) => {
+        const newListId = uid();
+        const now = Date.now();
+        const idMap = new Map<string, string>();
+        const items: Item[] = src.items.map((item) => {
+          const newId = uid();
+          idMap.set(item.id, newId);
+          return { ...item, id: newId };
+        });
+        const comparisons: Comparison[] = src.comparisons
+          .map((c) => {
+            const w = idMap.get(c.winnerId);
+            const l = idMap.get(c.loserId);
+            if (!w || !l) return null;
+            return { ...c, id: uid(), winnerId: w, loserId: l };
+          })
+          .filter((x): x is Comparison => x !== null);
+        set((s) => ({
+          lists: {
+            ...s.lists,
+            [newListId]: {
+              ...src,
+              id: newListId,
+              title: src.title,
+              items,
+              comparisons,
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+          order: [newListId, ...s.order],
+        }));
+        return newListId;
+      },
     }),
     {
       name: 'pairywise-store',

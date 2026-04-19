@@ -3,10 +3,12 @@
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
-import { rank } from '@/lib/ranking';
+import { rank, rankElo } from '@/lib/ranking';
 import type { Algorithm } from '@/lib/types';
 import { AlgorithmToggle } from '@/components/AlgorithmToggle';
 import { Leaderboard } from '@/components/Leaderboard';
+import { RatingHistoryChart } from '@/components/RatingHistoryChart';
+import { HardestChoices } from '@/components/HardestChoices';
 
 type Params = { id: string };
 
@@ -21,6 +23,11 @@ export default function ResultsPage({ params }: { params: Promise<Params> }) {
     if (!list) return [];
     return rank(algorithm, list.items, list.comparisons);
   }, [algorithm, list]);
+
+  const eloRankings = useMemo(() => {
+    if (!list) return [];
+    return rankElo(list.items, list.comparisons);
+  }, [list]);
 
   if (!list) {
     return (
@@ -68,11 +75,19 @@ export default function ResultsPage({ params }: { params: Promise<Params> }) {
       {list.items.length === 0 ? (
         <p className="text-foreground/60">Add items to see a ranking.</p>
       ) : (
-        <Leaderboard
-          items={list.items}
-          rankings={rankings}
-          scoreLabel={algorithm === 'elo' ? 'ELO' : 'log-strength'}
-        />
+        <>
+          <Leaderboard
+            items={list.items}
+            rankings={rankings}
+            scoreLabel={algorithm === 'elo' ? 'ELO' : 'log-strength'}
+          />
+          {list.comparisons.length > 0 && (
+            <div className="mt-6">
+              <RatingHistoryChart items={list.items} rankings={eloRankings} />
+            </div>
+          )}
+          <HardestChoices list={list} rankings={eloRankings} />
+        </>
       )}
       <p className="mt-6 text-xs text-foreground/50">
         {algorithm === 'elo'
