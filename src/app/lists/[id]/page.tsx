@@ -7,9 +7,13 @@ import { useStore } from '@/lib/store';
 import type { Item } from '@/lib/types';
 import { ItemEditor } from '@/components/ItemEditor';
 import { ShareDialog } from '@/components/ShareDialog';
+import { OverflowMenu, type OverflowAction } from '@/components/OverflowMenu';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useToast } from '@/components/Toaster';
+import { downloadJSON, exportList, slugify } from '@/lib/io';
+import { CombinedResults } from '@/components/results/CombinedResults';
+import { PairwiseResults } from '@/components/results/PairwiseResults';
 
 type Params = { id: string };
 
@@ -19,6 +23,8 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const addItem = useStore((s) => s.addItem);
   const updateItem = useStore((s) => s.updateItem);
   const removeItem = useStore((s) => s.removeItem);
+  const archiveList = useStore((s) => s.archiveList);
+  const duplicateList = useStore((s) => s.duplicateList);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -29,7 +35,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [moreModesOpen, setMoreModesOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const currentUserId = useCurrentUserId();
   const ownerIds = list?.ownerId ? [list.ownerId] : [];
   const profiles = useProfiles(ownerIds);
@@ -98,6 +104,47 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
 
   const canVote = list.items.length >= 2;
   const ownedByMe = !list.ownerId || list.ownerId === currentUserId;
+  const hasAnySignal =
+    list.comparisons.length > 0 ||
+    Object.keys(list.tierAssignments).length > 0 ||
+    Object.keys(list.directRatings).length > 0 ||
+    Boolean(list.bracket);
+  const hasPairwise = list.comparisons.length > 0;
+
+  const actions: OverflowAction[] = [];
+  if (ownedByMe) actions.push({ label: 'Share', onClick: () => setShareOpen(true) });
+  actions.push({
+    label: 'Export JSON',
+    onClick: () => {
+      downloadJSON(`${slugify(list.title)}.pairywise.json`, exportList(list));
+      toast.push(`Exported "${list.title}"`);
+    },
+  });
+  if (ownedByMe) {
+    actions.push({
+      label: 'Duplicate',
+      onClick: () => {
+        const newId = duplicateList(list.id);
+        if (newId) {
+          toast.push(`Duplicated "${list.title}"`, { kind: 'success' });
+          router.push(`/lists/${newId}`);
+        }
+      },
+    });
+    actions.push({
+      label: 'Archive',
+      danger: true,
+      onClick: () => {
+        archiveList(list.id);
+        toast.push(`Archived "${list.title}"`, { kind: 'info' });
+        router.push('/');
+      },
+    });
+  }
+
+  const primaryCta = canVote
+    ? { label: hasPairwise ? 'Continue voting' : 'Start voting', href: `/lists/${list.id}/vote` }
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
@@ -106,96 +153,61 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
           ← All lists
         </Link>
       </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words min-w-0">
-          {list.title}
-        </h1>
-        {!ownedByMe && (
-          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/70 font-semibold">
-            {list.ownerId
-              ? `Shared by ${profileLabel(profiles.get(list.ownerId), list.ownerId)}`
-              : 'Shared with you'}
-          </span>
-        )}
-      </div>
-      {list.description && (
-        <p className="mt-1 text-foreground/70">{list.description}</p>
-      )}
 
-      <div className="mt-6">
-        <div className="flex flex-wrap items-center gap-2">
+      <header className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
+              {list.title}
+            </h1>
+            {!ownedByMe && (
+              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/70 font-semibold">
+                {list.ownerId
+                  ? `Shared by ${profileLabel(profiles.get(list.ownerId), list.ownerId)}`
+                  : 'Shared with you'}
+              </span>
+            )}
+          </div>
+          {list.description && (
+            <p className="mt-1 text-foreground/70">{list.description}</p>
+          )}
+          <p className="mt-2 text-sm text-foreground/60">
+            {list.items.length} items · {list.comparisons.length} votes
+            {list.tags.length > 0 && <> · {list.tags.join(', ')}</>}
+          </p>
+        </div>
+        <div className="shrink-0">
+          <OverflowMenu actions={actions} />
+        </div>
+      </header>
+
+      {primaryCta && (
+        <div className="mt-5">
           <Link
-            href={`/lists/${list.id}/vote`}
-            aria-disabled={!canVote}
-            className={`rounded-md px-5 py-2.5 font-medium text-sm ${
-              canVote
-                ? 'bg-foreground text-background'
-                : 'bg-foreground/20 text-foreground/50 pointer-events-none'
-            }`}
+            href={primaryCta.href}
+            className="inline-block rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
           >
-            {canVote ? 'Start voting →' : 'Add 2+ items to vote'}
+            {primaryCta.label} →
           </Link>
+        </div>
+      )}
+      {!primaryCta && list.items.length < 2 && ownedByMe && (
+        <div className="mt-5">
           <button
             type="button"
-            onClick={() => setMoreModesOpen((v) => !v)}
-            aria-expanded={moreModesOpen}
-            className="rounded-md px-3 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 flex items-center gap-1"
+            onClick={openNew}
+            className="rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
           >
-            More ways to rank
-            <span aria-hidden className={`transition-transform ${moreModesOpen ? 'rotate-180' : ''}`}>
-              ▾
-            </span>
+            + Add items to start
           </button>
-          <Link
-            href={`/lists/${list.id}/results`}
-            className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5 ml-auto"
-          >
-            Results
-          </Link>
-          {ownedByMe && (
-            <button
-              type="button"
-              onClick={() => setShareOpen(true)}
-              className="rounded-md px-4 py-2 font-medium text-sm border border-foreground/20 hover:bg-foreground/5"
-            >
-              Share
-            </button>
-          )}
         </div>
-        {moreModesOpen && (
-          <div className="mt-2 flex flex-wrap gap-2 pl-1 text-sm">
-            <Link
-              href={`/lists/${list.id}/tiers`}
-              className="rounded-md px-3 py-1.5 border border-foreground/15 hover:bg-foreground/5 text-foreground/80"
-            >
-              Tier list <span className="text-foreground/40">· S/A/B/C/D</span>
-            </Link>
-            <Link
-              href={`/lists/${list.id}/rate`}
-              className="rounded-md px-3 py-1.5 border border-foreground/15 hover:bg-foreground/5 text-foreground/80"
-            >
-              Rate 1–10 <span className="text-foreground/40">· scores</span>
-            </Link>
-            <Link
-              href={`/lists/${list.id}/bracket`}
-              aria-disabled={!canVote}
-              className={`rounded-md px-3 py-1.5 border border-foreground/15 hover:bg-foreground/5 text-foreground/80 ${
-                canVote ? '' : 'opacity-40 pointer-events-none'
-              }`}
-            >
-              Tournament <span className="text-foreground/40">· bracket</span>
-            </Link>
-          </div>
-        )}
-      </div>
+      )}
+
       <ShareDialog
         listId={list.id}
         open={shareOpen}
         onClose={() => setShareOpen(false)}
       />
-      <div className="mt-3 text-sm text-foreground/60">
-        {list.items.length} items · {list.comparisons.length} votes
-      </div>
 
       <section className="mt-8">
         <div className="flex items-center justify-between mb-3">
@@ -204,14 +216,14 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
             <button
               type="button"
               onClick={openNew}
-              className="rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
+              className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
             >
               + Add item
             </button>
           )}
         </div>
         {list.items.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-black/20 dark:border-white/20 p-8 text-center">
+          <div className="rounded-lg border border-dashed border-foreground/20 p-8 text-center">
             <p className="text-sm text-foreground/70">
               {ownedByMe
                 ? 'No items yet. Add at least two to start voting.'
@@ -232,7 +244,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
             {list.items.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center gap-3 rounded-md border border-black/10 dark:border-white/10 p-2.5"
+                className="flex items-center gap-3 rounded-md border border-foreground/10 p-2.5"
               >
                 <ItemThumb item={item} />
                 <div className="flex-1 min-w-0">
@@ -281,6 +293,77 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         )}
       </section>
 
+      {list.items.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold">Current ranking</h2>
+          <p className="text-sm text-foreground/60 mt-1 mb-3">
+            Blends your A-vs-B votes, tier placements, 1–10 scores, and bracket
+            results into one order. {hasAnySignal
+              ? 'Drag the weights below to rebalance.'
+              : 'Use any of the ways-to-rank below to start building it.'}
+          </p>
+          <CombinedResults list={list} />
+        </section>
+      )}
+
+      {hasPairwise && (
+        <section className="mt-8">
+          <button
+            type="button"
+            onClick={() => setAnalyticsOpen((v) => !v)}
+            aria-expanded={analyticsOpen}
+            className="w-full flex items-center justify-between rounded-md border border-foreground/15 px-3 py-2 text-sm hover:bg-foreground/5"
+          >
+            <span className="font-medium">Pairwise analytics</span>
+            <span aria-hidden className={`transition-transform ${analyticsOpen ? 'rotate-180' : ''}`}>
+              ▾
+            </span>
+          </button>
+          {analyticsOpen && (
+            <div className="mt-3">
+              <PairwiseResults list={list} />
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">Ways to rank</h2>
+        <p className="text-sm text-foreground/60 mt-1 mb-3">
+          Four independent activities. Every signal you add feeds the ranking
+          above.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          <WayCard
+            href={`/lists/${list.id}/vote`}
+            title="A vs B"
+            subtitle="Compare two items at a time"
+            disabled={!canVote}
+            primary
+            progress={list.comparisons.length}
+          />
+          <WayCard
+            href={`/lists/${list.id}/tiers`}
+            title="Tier list"
+            subtitle="Drag items into S / A / B / C / D"
+            progress={Object.keys(list.tierAssignments).length}
+          />
+          <WayCard
+            href={`/lists/${list.id}/rate`}
+            title="Rate 1–10"
+            subtitle="Score each item on a slider"
+            progress={Object.keys(list.directRatings).length}
+          />
+          <WayCard
+            href={`/lists/${list.id}/bracket`}
+            title="Tournament"
+            subtitle="Single-elimination bracket"
+            disabled={!canVote}
+            progress={list.bracket ? list.bracket.seed.length : 0}
+          />
+        </div>
+      </section>
+
       <ItemEditor
         open={editorOpen}
         initial={editing ?? undefined}
@@ -295,6 +378,48 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
       />
     </div>
   );
+}
+
+function WayCard({
+  href,
+  title,
+  subtitle,
+  disabled,
+  primary,
+  progress,
+}: {
+  href: string;
+  title: string;
+  subtitle: string;
+  disabled?: boolean;
+  primary?: boolean;
+  progress: number;
+}) {
+  const body = (
+    <div
+      className={`rounded-lg border p-3 flex items-center justify-between gap-3 ${
+        disabled
+          ? 'border-foreground/10 text-foreground/40'
+          : primary
+            ? 'border-foreground hover:bg-foreground/5'
+            : 'border-foreground/15 hover:border-foreground/40'
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="font-medium">{title}</div>
+        <div className="text-xs text-foreground/60 mt-0.5">{subtitle}</div>
+      </div>
+      <div className="text-xs text-foreground/50 shrink-0 text-right">
+        {progress > 0 ? (
+          <span className="font-mono tabular-nums">{progress}</span>
+        ) : (
+          <span className="text-foreground/30">Not started</span>
+        )}
+      </div>
+    </div>
+  );
+  if (disabled) return body;
+  return <Link href={href}>{body}</Link>;
 }
 
 function ItemThumb({ item }: { item: Item }) {

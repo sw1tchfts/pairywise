@@ -2,14 +2,13 @@
 
 import Link from 'next/link';
 
-export type ModePage = 'vote' | 'tiers' | 'rate' | 'bracket' | 'results';
+export type ModePage = 'vote' | 'tiers' | 'rate' | 'bracket';
 
 const MODES: { key: ModePage; label: string; path: string; requiresPair: boolean }[] = [
   { key: 'vote', label: 'A vs B', path: 'vote', requiresPair: true },
   { key: 'tiers', label: 'Tier', path: 'tiers', requiresPair: false },
   { key: 'rate', label: 'Rate', path: 'rate', requiresPair: false },
   { key: 'bracket', label: 'Bracket', path: 'bracket', requiresPair: true },
-  { key: 'results', label: 'Results', path: 'results', requiresPair: false },
 ];
 
 export function ModeSwitcher({

@@ -8,6 +8,7 @@ import { downloadJSON, exportList, parseImport, slugify } from '@/lib/io';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
 import { summarize, timeAgo } from '@/lib/listSummary';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
+import { OverflowMenu, type OverflowAction } from '@/components/OverflowMenu';
 import type { RankList } from '@/lib/types';
 
 type SortKey = 'recent' | 'votes' | 'alpha';
@@ -27,6 +28,7 @@ export default function HomePage() {
   const [sort, setSort] = useState<SortKey>('recent');
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   async function handleImportFile(file: File) {
     try {
@@ -60,6 +62,16 @@ export default function HomePage() {
     [allLists, currentUserId],
   );
 
+  const ownerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const l of allLists) {
+      if (l.ownerId && l.ownerId !== currentUserId) ids.add(l.ownerId);
+    }
+    return Array.from(ids);
+  }, [allLists, currentUserId]);
+
+  const profiles = useProfiles(ownerIds);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return allLists.filter((l) => {
@@ -77,16 +89,6 @@ export default function HomePage() {
     });
   }, [allLists, query, activeTag, ownerFilter, currentUserId]);
 
-  const ownerIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const l of allLists) {
-      if (l.ownerId && l.ownerId !== currentUserId) ids.add(l.ownerId);
-    }
-    return Array.from(ids);
-  }, [allLists, currentUserId]);
-
-  const profiles = useProfiles(ownerIds);
-
   const sorted = useMemo(() => {
     const arr = [...filtered];
     switch (sort) {
@@ -98,13 +100,14 @@ export default function HomePage() {
         break;
       case 'recent':
       default:
-        arr.sort(
-          (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
-        );
+        arr.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
         break;
     }
     return arr;
   }, [filtered, sort]);
+
+  const advancedActive =
+    activeTag !== null || ownerFilter !== 'all';
 
   if (allLists.length === 0) {
     return (
@@ -122,9 +125,7 @@ export default function HomePage() {
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
             Your lists
           </h1>
-          <p className="mt-1 text-foreground/60 text-sm">
-            Create, rank, share.
-          </p>
+          <p className="mt-1 text-foreground/60 text-sm">Create, rank, share.</p>
         </div>
         <div className="flex items-center gap-2">
           <ImportInput inputRef={fileInput} onFile={handleImportFile} />
@@ -138,7 +139,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-2 flex-wrap">
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -156,56 +157,81 @@ export default function HomePage() {
           <option value="votes">Most voted</option>
           <option value="alpha">A–Z</option>
         </select>
-        {hasShared && (
-          <div className="inline-flex items-center rounded-md border border-foreground/15 p-0.5 bg-foreground/5 text-xs">
-            {(['all', 'mine', 'shared'] as OwnerFilter[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setOwnerFilter(k)}
-                className={`px-2.5 py-1 rounded font-medium transition ${
-                  ownerFilter === k
-                    ? 'bg-background shadow-sm'
-                    : 'text-foreground/60 hover:text-foreground'
-                }`}
-              >
-                {k === 'all' ? 'All' : k === 'mine' ? 'Mine' : 'Shared'}
-              </button>
-            ))}
-          </div>
+        {(allTags.length > 0 || hasShared) && (
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className={`text-sm px-3 py-1.5 rounded-md border transition-colors ${
+              advancedActive
+                ? 'border-foreground bg-foreground text-background'
+                : 'border-foreground/20 hover:bg-foreground/5'
+            }`}
+          >
+            Filters {advancedActive && `(${(activeTag ? 1 : 0) + (ownerFilter !== 'all' ? 1 : 0)})`}
+          </button>
         )}
       </div>
 
-      {allTags.length > 0 && (
-        <div className="mb-4 flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider text-foreground/50 mr-1">
-            Tags
-          </span>
-          <button
-            type="button"
-            onClick={() => setActiveTag(null)}
-            className={`text-xs px-2 py-0.5 rounded-full border ${
-              activeTag === null
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-foreground/15 hover:border-foreground/40'
-            }`}
-          >
-            all
-          </button>
-          {allTags.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setActiveTag((prev) => (prev === t ? null : t))}
-              className={`text-xs px-2 py-0.5 rounded-full border ${
-                activeTag === t
-                  ? 'border-foreground bg-foreground text-background'
-                  : 'border-foreground/15 hover:border-foreground/40'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
+      {filtersOpen && (
+        <div className="mb-4 rounded-lg border border-foreground/10 bg-foreground/5 p-3 space-y-3">
+          {hasShared && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-foreground/50 mb-1.5">
+                Show
+              </p>
+              <div className="inline-flex items-center rounded-md border border-foreground/15 p-0.5 bg-background text-xs">
+                {(['all', 'mine', 'shared'] as OwnerFilter[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setOwnerFilter(k)}
+                    className={`px-2.5 py-1 rounded font-medium transition ${
+                      ownerFilter === k
+                        ? 'bg-foreground text-background'
+                        : 'text-foreground/60 hover:text-foreground'
+                    }`}
+                  >
+                    {k === 'all' ? 'All' : k === 'mine' ? 'Mine' : 'Shared'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {allTags.length > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-foreground/50 mb-1.5">
+                Tag
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTag(null)}
+                  className={`text-xs px-2 py-0.5 rounded-full border ${
+                    activeTag === null
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-foreground/15 hover:border-foreground/40'
+                  }`}
+                >
+                  all
+                </button>
+                {allTags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setActiveTag((prev) => (prev === t ? null : t))}
+                    className={`text-xs px-2 py-0.5 rounded-full border ${
+                      activeTag === t
+                        ? 'border-foreground bg-foreground text-background'
+                        : 'border-foreground/15 hover:border-foreground/40'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -218,12 +244,41 @@ export default function HomePage() {
           {sorted.map((list) => {
             const ownedByMe = !list.ownerId || list.ownerId === currentUserId;
             const summary = summarize(list);
+            const cardActions: OverflowAction[] = [
+              {
+                label: 'Export JSON',
+                onClick: () => {
+                  downloadJSON(
+                    `${slugify(list.title)}.pairywise.json`,
+                    exportList(list),
+                  );
+                  toast.push(`Exported "${list.title}"`);
+                },
+              },
+            ];
+            if (ownedByMe) {
+              cardActions.push({
+                label: 'Duplicate',
+                onClick: () => {
+                  duplicateList(list.id);
+                  toast.push(`Duplicated "${list.title}"`, { kind: 'success' });
+                },
+              });
+              cardActions.push({
+                label: 'Archive',
+                danger: true,
+                onClick: () => {
+                  archiveList(list.id);
+                  toast.push(`Archived "${list.title}"`, { kind: 'info' });
+                },
+              });
+            }
             return (
               <li
                 key={list.id}
-                className="rounded-lg border border-black/10 dark:border-white/10 p-4 hover:border-black/30 dark:hover:border-white/30 transition"
+                className="rounded-lg border border-foreground/10 hover:border-foreground/30 transition"
               >
-                <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                <div className="flex items-start gap-3 p-4">
                   <Link href={`/lists/${list.id}`} className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium truncate">{list.title}</span>
@@ -271,48 +326,8 @@ export default function HomePage() {
                       </div>
                     )}
                   </Link>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        downloadJSON(
-                          `${slugify(list.title)}.pairywise.json`,
-                          exportList(list),
-                        );
-                        toast.push(`Exported "${list.title}"`);
-                      }}
-                      className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
-                    >
-                      Export
-                    </button>
-                    {ownedByMe && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          duplicateList(list.id);
-                          toast.push(`Duplicated "${list.title}"`, {
-                            kind: 'success',
-                          });
-                        }}
-                        className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
-                      >
-                        Duplicate
-                      </button>
-                    )}
-                    {ownedByMe && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          archiveList(list.id);
-                          toast.push(`Archived "${list.title}"`, {
-                            kind: 'info',
-                          });
-                        }}
-                        className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
-                      >
-                        Archive
-                      </button>
-                    )}
+                  <div className="shrink-0">
+                    <OverflowMenu actions={cardActions} />
                   </div>
                 </div>
               </li>
@@ -372,7 +387,7 @@ function EmptyHero({
       <p className="mt-3 text-foreground/70 sm:text-lg">
         Add a list of things — movies, coffee shops, job candidates. Vote
         between pairs, tier them S-to-D, score them 1–10, or run a bracket.
-        pairywise combines every signal into a single ranked list.
+        pairywise blends every signal into a single ranked list.
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
         <Link
