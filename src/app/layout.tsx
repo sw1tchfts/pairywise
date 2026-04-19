@@ -4,6 +4,9 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Toaster } from "@/components/Toaster";
 import { SessionMenu } from "@/components/SessionMenu";
+import { HeaderActions } from "@/components/HeaderActions";
+import { CloudHydrator } from "@/components/CloudHydrator";
+import { LocalListsMigration } from "@/components/LocalListsMigration";
 import "./globals.css";
 
 const themeScript = `
@@ -66,19 +69,17 @@ function HeaderAndMain({ children }: { children: React.ReactNode }) {
           <nav className="flex items-center gap-2 sm:gap-3 text-sm text-foreground/70">
             <ThemeToggle />
             <SessionMenu />
-            <Link
-              href="/lists/new"
-              className="rounded-md bg-foreground text-background px-3 py-1.5 font-medium hover:opacity-90 whitespace-nowrap"
-            >
-              + New list
-            </Link>
+            <HeaderActions />
           </nav>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <CloudHydrator>{children}</CloudHydrator>
+        <LocalListsMigration />
+      </main>
       <footer className="border-t border-black/10 dark:border-white/10">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 py-4 text-xs text-foreground/60">
-          pairywise · client-only MVP · data lives in your browser
+          pairywise
         </div>
       </footer>
     </>

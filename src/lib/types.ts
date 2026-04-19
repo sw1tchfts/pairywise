@@ -57,11 +57,16 @@ export const BracketSchema = z.object({
 });
 export type Bracket = z.infer<typeof BracketSchema>;
 
+export const VisibilitySchema = z.enum(['private', 'unlisted', 'public']);
+export type Visibility = z.infer<typeof VisibilitySchema>;
+
 export const ListSchema = z.object({
   id: z.string(),
+  ownerId: z.string().optional(),
   title: z.string(),
   description: z.string().optional(),
   tags: z.array(z.string()).default([]),
+  visibility: VisibilitySchema.default('private'),
   items: z.array(ItemSchema).default([]),
   comparisons: z.array(ComparisonSchema).default([]),
   algorithmDefault: z.enum(['elo', 'bradleyTerry']).default('elo'),
