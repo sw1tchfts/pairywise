@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Toaster } from "@/components/Toaster";
+import { SessionMenu } from "@/components/SessionMenu";
 import "./globals.css";
 
 const themeScript = `
@@ -64,6 +65,7 @@ function HeaderAndMain({ children }: { children: React.ReactNode }) {
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3 text-sm text-foreground/70">
             <ThemeToggle />
+            <SessionMenu />
             <Link
               href="/lists/new"
               className="rounded-md bg-foreground text-background px-3 py-1.5 font-medium hover:opacity-90 whitespace-nowrap"
