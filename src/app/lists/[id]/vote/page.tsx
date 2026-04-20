@@ -4,12 +4,14 @@ import { use } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { VoteScreen } from '@/components/VoteScreen';
+import { useListRealtime } from '@/lib/cloud/useListRealtime';
 
 type Params = { id: string };
 
 export default function VotePage({ params }: { params: Promise<Params> }) {
   const { id } = use(params);
   const list = useStore((s) => s.lists[id]);
+  useListRealtime(list?.id);
 
   if (!list) {
     return (

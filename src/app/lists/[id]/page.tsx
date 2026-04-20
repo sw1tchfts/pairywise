@@ -7,12 +7,14 @@ import { useStore } from '@/lib/store';
 import type { Item } from '@/lib/types';
 import { ItemEditor } from '@/components/ItemEditor';
 import { ShareDialog } from '@/components/ShareDialog';
+import { EditDetailsDialog } from '@/components/EditDetailsDialog';
 import { OverflowMenu, type OverflowAction } from '@/components/OverflowMenu';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useToast } from '@/components/Toaster';
 import { downloadJSON, exportList, slugify } from '@/lib/io';
 import { PairwiseResults } from '@/components/results/PairwiseResults';
+import { useListRealtime } from '@/lib/cloud/useListRealtime';
 
 type Params = { id: string };
 
@@ -34,9 +36,13 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const currentUserId = useCurrentUserId();
   const ownerIds = list?.ownerId ? [list.ownerId] : [];
   const profiles = useProfiles(ownerIds);
+
+  useListRealtime(list?.id);
 
   useEffect(() => {
     if (shouldAutoOpen && !autoOpenedRef.current) {
@@ -105,6 +111,12 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const hasPairwise = list.comparisons.length > 0;
 
   const actions: OverflowAction[] = [];
+  if (ownedByMe) {
+    actions.push({
+      label: 'Edit details',
+      onClick: () => setEditDetailsOpen(true),
+    });
+  }
   actions.push({
     label: ownedByMe ? 'Share & members' : 'Members',
     onClick: () => setShareOpen(true),
@@ -136,6 +148,21 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         router.push('/');
       },
     });
+  }
+
+  const shareable = ownedByMe && list.visibility && list.visibility !== 'private';
+  const shareUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}/shared/${list.id}` : '';
+
+  async function copyShareUrl() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      toast.push('Copy failed.', { kind: 'error' });
+    }
   }
 
   const primaryCta = canVote
@@ -199,10 +226,36 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         </div>
       )}
 
+      {shareable && (
+        <div className="mt-4 flex items-center gap-2 rounded-md border border-foreground/10 bg-foreground/5 px-3 py-2 text-xs">
+          <span className="shrink-0 text-foreground/60 uppercase tracking-wider">
+            {list.visibility === 'public' ? 'Public' : 'Unlisted'}
+          </span>
+          <input
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.target.select()}
+            className="flex-1 bg-transparent font-mono text-[11px] min-w-0 outline-none"
+          />
+          <button
+            type="button"
+            onClick={copyShareUrl}
+            className="shrink-0 px-2 py-1 rounded border border-foreground/20 hover:bg-foreground/10 font-medium"
+          >
+            {linkCopied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      )}
+
       <ShareDialog
         listId={list.id}
         open={shareOpen}
         onClose={() => setShareOpen(false)}
+      />
+      <EditDetailsDialog
+        listId={list.id}
+        open={editDetailsOpen}
+        onClose={() => setEditDetailsOpen(false)}
       />
 
       <section className="mt-8">
@@ -240,48 +293,42 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
             {list.items.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center gap-3 rounded-md border border-foreground/10 p-2.5"
+                className="flex items-stretch rounded-md border border-foreground/10 hover:border-foreground/30 transition overflow-hidden"
               >
-                <ItemThumb item={item} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{item.title}</div>
-                  <div className="text-xs text-foreground/60 truncate">
-                    {[
-                      item.imageUrl && 'image',
-                      item.audioUrl && 'audio',
-                      item.videoUrl && 'video',
-                      item.linkUrl && 'link',
-                    ]
-                      .filter(Boolean)
-                      .join(' · ') || item.description || 'Text only'}
-                    {item.tags.length > 0 && (
-                      <span className="text-foreground/50">
-                        {' · '}
-                        {item.tags.join(', ')}
-                      </span>
-                    )}
+                {ownedByMe ? (
+                  <button
+                    type="button"
+                    onClick={() => openEdit(item)}
+                    className="flex-1 min-w-0 flex items-center gap-3 p-2.5 text-left hover:bg-foreground/5"
+                  >
+                    <ItemThumb item={item} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {item.title}
+                      </div>
+                      <ItemSubtitle item={item} />
+                    </div>
+                  </button>
+                ) : (
+                  <div className="flex-1 min-w-0 flex items-center gap-3 p-2.5">
+                    <ItemThumb item={item} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {item.title}
+                      </div>
+                      <ItemSubtitle item={item} />
+                    </div>
                   </div>
-                </div>
+                )}
                 {ownedByMe && (
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(item)}
-                      aria-label={`Edit ${item.title}`}
-                      className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(item)}
-                      aria-label={`Remove ${item.title}`}
-                      className="text-sm px-3 py-1.5 rounded-md border border-transparent text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:border-red-200 dark:hover:border-red-900"
-                    >
-                      <span className="sm:hidden" aria-hidden>×</span>
-                      <span className="hidden sm:inline">Remove</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(item)}
+                    aria-label={`Remove ${item.title}`}
+                    className="shrink-0 px-3 text-foreground/40 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 border-l border-foreground/10 text-lg leading-none"
+                  >
+                    ×
+                  </button>
                 )}
               </li>
             ))}
@@ -312,6 +359,27 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         }}
         onSave={handleSave}
       />
+    </div>
+  );
+}
+
+function ItemSubtitle({ item }: { item: Item }) {
+  const mediaTags = [
+    item.imageUrl && 'image',
+    item.audioUrl && 'audio',
+    item.videoUrl && 'video',
+    item.linkUrl && 'link',
+  ].filter(Boolean);
+  const text = mediaTags.join(' · ') || item.description || 'Text only';
+  return (
+    <div className="text-xs text-foreground/60 truncate">
+      {text}
+      {item.tags.length > 0 && (
+        <span className="text-foreground/50">
+          {' · '}
+          {item.tags.join(', ')}
+        </span>
+      )}
     </div>
   );
 }

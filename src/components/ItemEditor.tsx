@@ -60,6 +60,11 @@ function findDuplicate(
   return null;
 }
 
+function hasMedia(item: Partial<Item> | undefined): boolean {
+  if (!item) return false;
+  return Boolean(item.imageUrl || item.audioUrl || item.videoUrl || item.linkUrl);
+}
+
 function ItemEditorForm({
   initial,
   onClose,
@@ -76,6 +81,8 @@ function ItemEditorForm({
     title: initial?.title ?? '',
   }));
   const [importMode, setImportMode] = useState<'none' | 'url' | 'tmdb'>('none');
+  const [importOpen, setImportOpen] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(() => hasMedia(initial));
   const [showPreview, setShowPreview] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -92,6 +99,7 @@ function ItemEditorForm({
       tags: patch.tags ?? d.tags,
     }));
     setImportMode('none');
+    setImportOpen(false);
     setTimeout(() => titleRef.current?.focus(), 0);
   }
 
@@ -127,8 +135,18 @@ function ItemEditorForm({
     if (!draft.title.trim()) return;
     commit();
     setDraft({ ...EMPTY });
+    setMediaOpen(false);
+    setImportOpen(false);
+    setImportMode('none');
     setTimeout(() => titleRef.current?.focus(), 0);
   }
+
+  const mediaCount = [
+    draft.imageUrl,
+    draft.audioUrl,
+    draft.videoUrl,
+    draft.linkUrl,
+  ].filter((v) => v?.trim()).length;
 
   return (
     <div
@@ -154,48 +172,6 @@ function ItemEditorForm({
               Close
             </button>
           </div>
-
-          {!isEditing && (
-            <div className="rounded-md border border-dashed border-black/15 dark:border-white/15 p-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-wider text-foreground/60">
-                  Quick import (optional)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setImportMode(importMode === 'url' ? 'none' : 'url')}
-                  className={`text-xs px-2 py-1 rounded border ${
-                    importMode === 'url'
-                      ? 'border-foreground bg-foreground/5'
-                      : 'border-foreground/20 hover:bg-foreground/5'
-                  }`}
-                >
-                  From URL
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImportMode(importMode === 'tmdb' ? 'none' : 'tmdb')}
-                  className={`text-xs px-2 py-1 rounded border ${
-                    importMode === 'tmdb'
-                      ? 'border-foreground bg-foreground/5'
-                      : 'border-foreground/20 hover:bg-foreground/5'
-                  }`}
-                >
-                  Movie / TV
-                </button>
-              </div>
-              {importMode === 'url' && (
-                <div className="mt-3">
-                  <UrlPreviewInput onImport={handleImport} />
-                </div>
-              )}
-              {importMode === 'tmdb' && (
-                <div className="mt-3">
-                  <TmdbSearchInput onImport={handleImport} />
-                </div>
-              )}
-            </div>
-          )}
 
           <Field label="Title" required>
             <input
@@ -235,10 +211,56 @@ function ItemEditorForm({
             />
           </Field>
 
-          <fieldset className="border border-black/10 dark:border-white/10 rounded-md p-3">
-            <legend className="text-xs uppercase tracking-wider text-foreground/60 px-1">
-              Media (any combination)
-            </legend>
+          {!isEditing && (
+            <Disclosure
+              open={importOpen}
+              onToggle={() => setImportOpen((v) => !v)}
+              label="Import from URL or Movie / TV"
+            >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportMode(importMode === 'url' ? 'none' : 'url')}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    importMode === 'url'
+                      ? 'border-foreground bg-foreground/5'
+                      : 'border-foreground/20 hover:bg-foreground/5'
+                  }`}
+                >
+                  From URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode(importMode === 'tmdb' ? 'none' : 'tmdb')}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    importMode === 'tmdb'
+                      ? 'border-foreground bg-foreground/5'
+                      : 'border-foreground/20 hover:bg-foreground/5'
+                  }`}
+                >
+                  Movie / TV
+                </button>
+              </div>
+              {importMode === 'url' && (
+                <div className="mt-3">
+                  <UrlPreviewInput onImport={handleImport} />
+                </div>
+              )}
+              {importMode === 'tmdb' && (
+                <div className="mt-3">
+                  <TmdbSearchInput onImport={handleImport} />
+                </div>
+              )}
+            </Disclosure>
+          )}
+
+          <Disclosure
+            open={mediaOpen}
+            onToggle={() => setMediaOpen((v) => !v)}
+            label={
+              mediaCount > 0 ? `Media (${mediaCount} set)` : 'Add media'
+            }
+          >
             <div className="space-y-2">
               <Field label="Image URL">
                 <input
@@ -277,7 +299,7 @@ function ItemEditorForm({
                 />
               </Field>
             </div>
-          </fieldset>
+          </Disclosure>
 
           <div className="flex items-center justify-between gap-2 pt-1">
             <button
@@ -340,6 +362,33 @@ function ItemEditorForm({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function Disclosure({
+  open,
+  onToggle,
+  label,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between rounded-md border border-foreground/15 px-3 py-2 text-sm hover:bg-foreground/5"
+      >
+        <span className="font-medium">{label}</span>
+        <span aria-hidden className={`transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+      {open && <div className="mt-3">{children}</div>}
     </div>
   );
 }
