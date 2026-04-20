@@ -2,12 +2,13 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { hasSupabaseEnv, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
 
-const PUBLIC_ROUTES = ['/signin', '/signup', '/auth'];
+// Signed-in users are redirected away from these (back to /).
+const SIGNED_IN_DISALLOWED = ['/signin', '/signup'];
+// Signed-out users are allowed to visit these.
+const SIGNED_OUT_ALLOWED = ['/signin', '/signup', '/auth', '/shared'];
 
-function isPublic(pathname: string) {
-  return PUBLIC_ROUTES.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
+function matches(pathname: string, prefixes: string[]) {
+  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export async function proxy(request: NextRequest) {
@@ -38,16 +39,18 @@ export async function proxy(request: NextRequest) {
   const signedIn = Boolean(data.user);
   const { pathname } = request.nextUrl;
 
-  // Signed-in users visiting /signin or /signup go home.
-  if (signedIn && isPublic(pathname)) {
+  // Signed-in users visiting /signin or /signup go home. (/shared is NOT in
+  // this list — signed-in users on /shared need to reach the auto-join flow.)
+  if (signedIn && matches(pathname, SIGNED_IN_DISALLOWED)) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     url.search = '';
     return NextResponse.redirect(url);
   }
 
-  // Signed-out users on protected routes go to /signin.
-  if (!signedIn && !isPublic(pathname)) {
+  // Signed-out users on protected routes go to /signin. /shared is public so
+  // that iMessage / Slack / Twitter can unfurl the link without auth.
+  if (!signedIn && !matches(pathname, SIGNED_OUT_ALLOWED)) {
     const url = request.nextUrl.clone();
     url.pathname = '/signin';
     url.search = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname)}`;
@@ -60,9 +63,10 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match everything except static assets and API routes that don't need auth.
-     * OG image + TMDB search remain public since they're server-rendered utilities.
+     * Match everything except static assets, OG routes, and TMDB search.
+     * /api/og-list is excluded so bots like Apple's link preview can fetch
+     * the image without hitting the auth gate.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|manifest\\.webmanifest|api/og|api/tmdb).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|manifest\\.webmanifest|api/og|api/og-list|api/tmdb).*)',
   ],
 };
