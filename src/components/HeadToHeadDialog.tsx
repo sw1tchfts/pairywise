@@ -3,6 +3,7 @@
 import { useEffect, useMemo } from 'react';
 import type { RankList } from '@/lib/types';
 import { rankElo } from '@/lib/ranking';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 type Props = {
   list: RankList;
@@ -20,6 +21,8 @@ type OpponentRow = {
 };
 
 export function HeadToHeadDialog({ list, itemId, onClose }: Props) {
+  useBodyScrollLock(itemId !== null);
+
   useEffect(() => {
     if (!itemId) return;
     const onKey = (e: KeyboardEvent) => {

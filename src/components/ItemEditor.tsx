@@ -6,6 +6,7 @@ import { UrlPreviewInput } from './UrlPreviewInput';
 import { TmdbSearchInput } from './TmdbSearchInput';
 import { TagInput } from './TagInput';
 import { VoteCard } from './VoteCard';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 type Props = {
   open: boolean;
@@ -32,6 +33,7 @@ const EMPTY: Omit<Item, 'id'> = {
 };
 
 export function ItemEditor({ open, ...rest }: Props) {
+  useBodyScrollLock(open);
   if (!open) return null;
   return <ItemEditorForm {...rest} />;
 }

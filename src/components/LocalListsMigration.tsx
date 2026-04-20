@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from './Toaster';
 import { ListSchema, type RankList } from '@/lib/types';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 const LEGACY_KEY = 'pairywise-store';
 const MIGRATED_FLAG = 'pairywise-local-migrated';
@@ -52,6 +53,8 @@ export function LocalListsMigration() {
   }, [hydrated]);
 
   const count = useMemo(() => pending?.length ?? 0, [pending]);
+
+  useBodyScrollLock(pending !== null);
 
   function dismiss(cleanup: boolean) {
     if (cleanup && typeof window !== 'undefined') {

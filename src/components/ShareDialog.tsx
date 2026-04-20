@@ -8,6 +8,7 @@ import type { Visibility } from '@/lib/types';
 import * as api from '@/lib/cloud/api';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 const VISIBILITY_LABEL: Record<Visibility, string> = {
   private: 'Private · only you',
@@ -65,6 +66,8 @@ export function ShareDialog({
       setLoadingMembers(false);
     }
   }, [listId, toast]);
+
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
