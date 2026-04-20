@@ -5,6 +5,7 @@ import type {
   Bracket,
   Comparison,
   Item,
+  Phase,
   RankList,
   Tier,
 } from '../types';
@@ -244,7 +245,12 @@ export async function insertList(list: RankList): Promise<void> {
 
 export async function updateListFields(
   listId: string,
-  patch: Partial<Pick<RankList, 'title' | 'description' | 'tags' | 'algorithmDefault' | 'visibility'>>,
+  patch: Partial<
+    Pick<
+      RankList,
+      'title' | 'description' | 'tags' | 'algorithmDefault' | 'visibility' | 'phase'
+    >
+  >,
 ): Promise<void> {
   const supabase = getBrowserClient();
   const update: Record<string, unknown> = {};
@@ -253,8 +259,28 @@ export async function updateListFields(
   if ('tags' in patch) update.tags = patch.tags ?? [];
   if ('algorithmDefault' in patch) update.algorithm_default = patch.algorithmDefault;
   if ('visibility' in patch) update.visibility = patch.visibility;
+  if ('phase' in patch) update.phase = patch.phase;
   const { error } = await supabase.from('lists').update(update).eq('id', listId);
   if (error) throw error;
+}
+
+export async function updateListPhase(listId: string, phase: Phase): Promise<void> {
+  return updateListFields(listId, { phase });
+}
+
+export type ItemCountRow = { userId: string; count: number };
+
+export async function fetchItemCounts(listId: string): Promise<ItemCountRow[]> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.rpc('list_item_counts', {
+    p_list_id: listId,
+  });
+  if (error) throw error;
+  type Row = { user_id: string; item_count: number };
+  return ((data ?? []) as Row[]).map((r) => ({
+    userId: r.user_id,
+    count: Number(r.item_count),
+  }));
 }
 
 export async function deleteList(listId: string): Promise<void> {
@@ -417,6 +443,20 @@ export async function insertComparison(
   const userId = await getCurrentUserId();
   if (!userId) throw new Error('Not authenticated.');
   const supabase = getBrowserClient();
+  // Unique constraint: (list_id, voter_id, unordered(winner, loser)) where
+  // skipped=false. Postgres can't UPSERT on a partial expression index, so
+  // we delete any existing non-skipped match for this pair first, then insert.
+  if (!c.skipped) {
+    const { error: delError } = await supabase
+      .from('comparisons')
+      .delete()
+      .eq('list_id', listId)
+      .eq('voter_id', userId)
+      .eq('skipped', false)
+      .in('winner_id', [c.winnerId, c.loserId])
+      .in('loser_id', [c.winnerId, c.loserId]);
+    if (delError) throw delError;
+  }
   const { error } = await supabase.from('comparisons').insert({
     id: c.id,
     list_id: listId,

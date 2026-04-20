@@ -22,12 +22,14 @@ export const ItemSchema = z.object({
   videoUrl: z.string().optional(),
   linkUrl: z.string().optional(),
   externalId: z.string().optional(),
+  creatorId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;
 
 export const ComparisonSchema = z.object({
   id: z.string(),
+  voterId: z.string().optional(),
   winnerId: z.string(),
   loserId: z.string(),
   skipped: z.boolean().optional(),
@@ -60,6 +62,9 @@ export type Bracket = z.infer<typeof BracketSchema>;
 export const VisibilitySchema = z.enum(['private', 'unlisted', 'public']);
 export type Visibility = z.infer<typeof VisibilitySchema>;
 
+export const PhaseSchema = z.enum(['submission', 'voting']);
+export type Phase = z.infer<typeof PhaseSchema>;
+
 export const ListSchema = z.object({
   id: z.string(),
   ownerId: z.string().optional(),
@@ -67,6 +72,7 @@ export const ListSchema = z.object({
   description: z.string().optional(),
   tags: z.array(z.string()).default([]),
   visibility: VisibilitySchema.default('private'),
+  phase: PhaseSchema.default('voting'),
   items: z.array(ItemSchema).default([]),
   comparisons: z.array(ComparisonSchema).default([]),
   algorithmDefault: z.enum(['elo', 'bradleyTerry']).default('elo'),

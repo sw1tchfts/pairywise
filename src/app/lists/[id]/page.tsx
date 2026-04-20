@@ -15,6 +15,7 @@ import { useToast } from '@/components/Toaster';
 import { downloadJSON, exportList, slugify } from '@/lib/io';
 import { PairwiseResults } from '@/components/results/PairwiseResults';
 import { useListRealtime } from '@/lib/cloud/useListRealtime';
+import * as api from '@/lib/cloud/api';
 
 type Params = { id: string };
 
@@ -33,16 +34,40 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
   const autoOpenedRef = useRef(false);
   const toast = useToast();
 
+  const setPhase = useStore((s) => s.setPhase);
+
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [counts, setCounts] = useState<api.ItemCountRow[] | null>(null);
   const currentUserId = useCurrentUserId();
-  const ownerIds = list?.ownerId ? [list.ownerId] : [];
-  const profiles = useProfiles(ownerIds);
+  const profileIds = [
+    ...(list?.ownerId ? [list.ownerId] : []),
+    ...(counts?.map((c) => c.userId) ?? []),
+  ];
+  const profiles = useProfiles(profileIds);
 
   useListRealtime(list?.id);
+
+  // Fetch aggregate item counts while the list is in submission phase
+  // (members can't see each other's items, only counts).
+  useEffect(() => {
+    if (!list || list.phase !== 'submission') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await api.fetchItemCounts(list.id);
+        if (!cancelled) setCounts(rows);
+      } catch {
+        if (!cancelled) setCounts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [list?.id, list?.phase, list?.items.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (shouldAutoOpen && !autoOpenedRef.current) {
@@ -106,15 +131,41 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
     );
   }
 
-  const canVote = list.items.length >= 2;
+  const phase = list.phase ?? 'voting';
+  const isSubmission = phase === 'submission';
+  const canVote = !isSubmission && list.items.length >= 2;
   const ownedByMe = !list.ownerId || list.ownerId === currentUserId;
   const hasPairwise = list.comparisons.length > 0;
+  const canAddItems = ownedByMe || isSubmission;
+
+  const totalItems =
+    counts?.reduce((n, row) => n + row.count, 0) ?? list.items.length;
+  const myCount =
+    currentUserId
+      ? (counts?.find((c) => c.userId === currentUserId)?.count ??
+         list.items.filter((i) => i.creatorId === currentUserId).length)
+      : 0;
+  const otherContributors = counts
+    ? counts.filter((c) => c.userId !== currentUserId)
+    : [];
 
   const actions: OverflowAction[] = [];
   if (ownedByMe) {
     actions.push({
       label: 'Edit details',
       onClick: () => setEditDetailsOpen(true),
+    });
+    actions.push({
+      label: isSubmission ? 'Open voting' : 'Lock (back to submission)',
+      onClick: () => {
+        const next = isSubmission ? 'voting' : 'submission';
+        if (!isSubmission && !confirm('Lock the list and hide ideas again?')) return;
+        setPhase(list.id, next);
+        toast.push(
+          next === 'voting' ? 'Voting is open.' : 'List locked.',
+          { kind: 'success' },
+        );
+      },
     });
   }
   actions.push({
@@ -169,6 +220,16 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
     ? { label: hasPairwise ? 'Continue voting' : 'Start voting', href: `/lists/${list.id}/vote` }
     : null;
 
+  const phasePill = isSubmission ? (
+    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-300 font-semibold">
+      Submission phase
+    </span>
+  ) : (
+    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-semibold">
+      Voting open
+    </span>
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-10">
       <div className="mb-2 text-sm">
@@ -183,6 +244,7 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
               {list.title}
             </h1>
+            {phasePill}
             {!ownedByMe && (
               <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-foreground/10 text-foreground/70 font-semibold">
                 {list.ownerId
@@ -195,7 +257,9 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
             <p className="mt-1 text-foreground/70">{list.description}</p>
           )}
           <p className="mt-2 text-sm text-foreground/60">
-            {list.items.length} items · {list.comparisons.length} votes
+            {isSubmission
+              ? `${totalItems} ideas${myCount > 0 ? ` · you added ${myCount}` : ''}`
+              : `${list.items.length} items · ${list.comparisons.length} votes`}
             {list.tags.length > 0 && <> · {list.tags.join(', ')}</>}
           </p>
         </div>
@@ -204,25 +268,75 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         </div>
       </header>
 
-      {primaryCta && (
-        <div className="mt-5">
-          <Link
-            href={primaryCta.href}
-            className="inline-block rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
-          >
-            {primaryCta.label} →
-          </Link>
-        </div>
-      )}
-      {!primaryCta && list.items.length < 2 && ownedByMe && (
-        <div className="mt-5">
+      {isSubmission ? (
+        <div className="mt-5 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={openNew}
             className="rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
           >
-            + Add items to start
+            + Add idea
           </button>
+          {ownedByMe && (
+            <button
+              type="button"
+              onClick={() => {
+                if (list.items.length < 2) {
+                  toast.push('Add at least 2 ideas first.', { kind: 'error' });
+                  return;
+                }
+                setPhase(list.id, 'voting');
+                toast.push('Voting is open.', { kind: 'success' });
+              }}
+              disabled={list.items.length < 2}
+              className="rounded-md border border-foreground/25 px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 disabled:opacity-40"
+            >
+              Open voting →
+            </button>
+          )}
+          <p className="basis-full text-xs text-foreground/55">
+            Ideas are hidden from other members until the owner opens voting.
+            Only you can see your own submissions for now.
+          </p>
+        </div>
+      ) : (
+        <>
+          {primaryCta && (
+            <div className="mt-5">
+              <Link
+                href={primaryCta.href}
+                className="inline-block rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
+              >
+                {primaryCta.label} →
+              </Link>
+            </div>
+          )}
+          {!primaryCta && list.items.length < 2 && ownedByMe && (
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={openNew}
+                className="rounded-md bg-foreground text-background px-5 py-2.5 font-medium"
+              >
+                + Add items to start
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {isSubmission && counts && counts.length > 0 && (
+        <div className="mt-4 rounded-md border border-foreground/10 bg-foreground/5 px-3 py-2 text-xs">
+          <span className="text-foreground/60 uppercase tracking-wider mr-2">
+            Submissions
+          </span>
+          <span className="font-medium">You {myCount}</span>
+          {otherContributors.map((c) => (
+            <span key={c.userId} className="text-foreground/70 ml-3">
+              {profileLabel(profiles.get(c.userId), c.userId)} {c.count}
+            </span>
+          ))}
+          <span className="text-foreground/50 ml-3">· total {totalItems}</span>
         </div>
       )}
 
@@ -260,31 +374,35 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
 
       <section className="mt-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">Items</h2>
-          {ownedByMe && (
+          <h2 className="text-lg font-semibold">
+            {isSubmission && !ownedByMe ? 'Your ideas' : 'Items'}
+          </h2>
+          {canAddItems && (
             <button
               type="button"
               onClick={openNew}
               className="text-sm px-3 py-1.5 rounded-md border border-foreground/20 hover:bg-foreground/5"
             >
-              + Add item
+              + Add {isSubmission ? 'idea' : 'item'}
             </button>
           )}
         </div>
         {list.items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-foreground/20 p-8 text-center">
             <p className="text-sm text-foreground/70">
-              {ownedByMe
-                ? 'No items yet. Add at least two to start voting.'
+              {canAddItems
+                ? isSubmission
+                  ? "No ideas yet. Add yours — no one else can see them until voting opens."
+                  : 'No items yet. Add at least two to start voting.'
                 : 'This list has no items yet.'}
             </p>
-            {ownedByMe && (
+            {canAddItems && (
               <button
                 type="button"
                 onClick={openNew}
                 className="mt-3 rounded-md bg-foreground text-background px-3 py-1.5 text-sm font-medium"
               >
-                + Add your first item
+                + Add your first {isSubmission ? 'idea' : 'item'}
               </button>
             )}
           </div>
@@ -336,12 +454,12 @@ export default function ListDetailPage({ params }: { params: Promise<Params> }) 
         )}
       </section>
 
-      {list.items.length > 0 && (
+      {!isSubmission && list.items.length > 0 && (
         <section className="mt-10">
           <h2 className="text-lg font-semibold">Ranking</h2>
           <p className="text-sm text-foreground/60 mt-1 mb-3">
-            Built from your head-to-head votes. Tap any row to see its
-            matchup record.
+            Built from everyone&apos;s head-to-head votes. Tap any row to see
+            its matchup record.
           </p>
           <PairwiseResults list={list} />
         </section>

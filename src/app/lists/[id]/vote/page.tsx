@@ -24,6 +24,24 @@ export default function VotePage({ params }: { params: Promise<Params> }) {
     );
   }
 
+  if ((list.phase ?? 'voting') === 'submission') {
+    return (
+      <div className="mx-auto max-w-md px-6 py-16 text-center">
+        <h1 className="text-xl font-semibold">Voting hasn&apos;t started yet</h1>
+        <p className="mt-2 text-sm text-foreground/60">
+          The list is still in submission phase. Ideas are hidden until the
+          owner opens voting.
+        </p>
+        <Link
+          href={`/lists/${list.id}`}
+          className="mt-5 inline-block rounded-md bg-foreground text-background px-4 py-2 text-sm"
+        >
+          Back to list
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="mx-auto max-w-5xl px-4 sm:px-6 pt-6 text-sm">

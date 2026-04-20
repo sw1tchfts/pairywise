@@ -5,6 +5,7 @@ import type {
   Algorithm,
   Comparison,
   Item,
+  Phase,
   RankList,
   Visibility,
 } from './types';
@@ -17,6 +18,7 @@ type State = {
   hydrated: boolean;
   hydrating: boolean;
   hydrateError: string | null;
+  currentUserId: string | null;
 };
 
 type Actions = {
@@ -27,6 +29,7 @@ type Actions = {
     description?: string;
     tags?: string[];
     visibility?: Visibility;
+    phase?: Phase;
   }) => string;
   deleteList: (id: string) => void;
   archiveList: (id: string) => void;
@@ -35,9 +38,13 @@ type Actions = {
   updateList: (
     id: string,
     patch: Partial<
-      Pick<RankList, 'title' | 'description' | 'tags' | 'algorithmDefault' | 'visibility'>
+      Pick<
+        RankList,
+        'title' | 'description' | 'tags' | 'algorithmDefault' | 'visibility' | 'phase'
+      >
     >,
   ) => void;
+  setPhase: (id: string, phase: Phase) => void;
   addItem: (listId: string, item: Omit<Item, 'id'>) => string;
   updateItem: (listId: string, itemId: string, patch: Partial<Omit<Item, 'id'>>) => void;
   removeItem: (listId: string, itemId: string) => void;
@@ -58,19 +65,29 @@ export const useStore = create<State & Actions>()((set, get) => ({
   hydrated: false,
   hydrating: false,
   hydrateError: null,
+  currentUserId: null,
 
   hydrate: async () => {
     if (get().hydrating) return;
     set({ hydrating: true, hydrateError: null });
     try {
-      const lists = await api.fetchAllLists();
+      const [userId, lists] = await Promise.all([
+        api.getCurrentUserId(),
+        api.fetchAllLists(),
+      ]);
       const map: Record<string, RankList> = {};
       const order: string[] = [];
       for (const l of lists) {
         map[l.id] = l;
         order.push(l.id);
       }
-      set({ lists: map, order, hydrated: true, hydrating: false });
+      set({
+        lists: map,
+        order,
+        hydrated: true,
+        hydrating: false,
+        currentUserId: userId,
+      });
     } catch (err) {
       set({
         hydrating: false,
@@ -80,9 +97,17 @@ export const useStore = create<State & Actions>()((set, get) => ({
     }
   },
 
-  reset: () => set({ lists: {}, order: [], hydrated: false, hydrating: false, hydrateError: null }),
+  reset: () =>
+    set({
+      lists: {},
+      order: [],
+      hydrated: false,
+      hydrating: false,
+      hydrateError: null,
+      currentUserId: null,
+    }),
 
-  createList: ({ title, description, tags, visibility }) => {
+  createList: ({ title, description, tags, visibility, phase }) => {
     const id = uid();
     const now = Date.now();
     const list: RankList = {
@@ -91,6 +116,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
       description,
       tags: tags ?? [],
       visibility: visibility ?? 'private',
+      phase: phase ?? 'submission',
       items: [],
       comparisons: [],
       algorithmDefault: 'elo',
@@ -190,9 +216,25 @@ export const useStore = create<State & Actions>()((set, get) => ({
     api.updateListFields(id, patch).catch((e) => reportCloudError('updateList', e));
   },
 
+  setPhase: (id, phase) => {
+    set((s) => {
+      const list = s.lists[id];
+      if (!list) return s;
+      return {
+        lists: {
+          ...s.lists,
+          [id]: { ...list, phase, updatedAt: Date.now() },
+        },
+      };
+    });
+    api.updateListPhase(id, phase).catch((e) => reportCloudError('setPhase', e));
+  },
+
   addItem: (listId, item) => {
     const itemId = uid();
+    const creatorId = get().currentUserId ?? undefined;
     let position = 0;
+    const stamped: Item = { ...item, id: itemId, creatorId };
     set((s) => {
       const list = s.lists[listId];
       if (!list) return s;
@@ -202,14 +244,14 @@ export const useStore = create<State & Actions>()((set, get) => ({
           ...s.lists,
           [listId]: {
             ...list,
-            items: [...list.items, { ...item, id: itemId }],
+            items: [...list.items, stamped],
             updatedAt: Date.now(),
           },
         },
       };
     });
     api
-      .insertItem(listId, { ...item, id: itemId }, position)
+      .insertItem(listId, stamped, position)
       .catch((e) => reportCloudError('addItem', e));
     return itemId;
   },
@@ -272,16 +314,32 @@ export const useStore = create<State & Actions>()((set, get) => ({
   },
 
   recordComparison: (listId, winnerId, loserId) => {
-    const c: Comparison = { id: uid(), winnerId, loserId, createdAt: Date.now() };
+    const voterId = get().currentUserId ?? undefined;
+    const c: Comparison = {
+      id: uid(),
+      voterId,
+      winnerId,
+      loserId,
+      createdAt: Date.now(),
+    };
     set((s) => {
       const list = s.lists[listId];
       if (!list) return s;
+      // Replace any existing non-skipped vote from this user on the same pair
+      // so the store mirrors the DB's unique-per-pair constraint.
+      const filtered = list.comparisons.filter((existing) => {
+        if (existing.skipped) return true;
+        if (existing.voterId && voterId && existing.voterId !== voterId) return true;
+        const sameA = existing.winnerId === winnerId && existing.loserId === loserId;
+        const sameB = existing.winnerId === loserId && existing.loserId === winnerId;
+        return !(sameA || sameB);
+      });
       return {
         lists: {
           ...s.lists,
           [listId]: {
             ...list,
-            comparisons: [...list.comparisons, c],
+            comparisons: [...filtered, c],
             updatedAt: Date.now(),
           },
         },
@@ -291,8 +349,10 @@ export const useStore = create<State & Actions>()((set, get) => ({
   },
 
   skipPair: (listId, aId, bId) => {
+    const voterId = get().currentUserId ?? undefined;
     const c: Comparison = {
       id: uid(),
+      voterId,
       winnerId: aId,
       loserId: bId,
       skipped: true,

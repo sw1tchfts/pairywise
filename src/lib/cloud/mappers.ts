@@ -4,6 +4,7 @@ import type {
   Comparison,
   Item,
   ItemType,
+  Phase,
   RankList,
   Tier,
   Visibility,
@@ -18,6 +19,7 @@ export type ListRow = {
   description: string | null;
   tags: string[];
   visibility: Visibility;
+  phase: Phase;
   algorithm_default: Algorithm;
   tier_assignments: Record<string, Tier>;
   direct_ratings: Record<string, number>;
@@ -42,6 +44,7 @@ export type ItemRow = {
   metadata: Record<string, unknown> | null;
   position: number;
   created_at: string;
+  created_by: string | null;
 };
 
 export type ComparisonRow = {
@@ -68,6 +71,7 @@ export function listFromRow(
     description: row.description ?? undefined,
     tags: row.tags ?? [],
     visibility: row.visibility,
+    phase: row.phase,
     items,
     comparisons,
     algorithmDefault: row.algorithm_default,
@@ -92,6 +96,7 @@ export function itemFromRow(row: ItemRow): Item {
     videoUrl: row.video_url ?? undefined,
     linkUrl: row.link_url ?? undefined,
     externalId: row.external_id ?? undefined,
+    creatorId: row.created_by ?? undefined,
     metadata: row.metadata ?? undefined,
   };
 }
@@ -99,6 +104,7 @@ export function itemFromRow(row: ItemRow): Item {
 export function comparisonFromRow(row: ComparisonRow): Comparison {
   return {
     id: row.id,
+    voterId: row.voter_id,
     winnerId: row.winner_id,
     loserId: row.loser_id,
     skipped: row.skipped || undefined,

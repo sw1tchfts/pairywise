@@ -34,6 +34,19 @@ export function VoteScreen({ list }: Props) {
     return localStorage.getItem(TIP_KEY) !== '1';
   });
 
+  const currentUserId = useStore((s) => s.currentUserId);
+
+  /** Comparisons cast by the current user — used to decide which pairs to
+   *  show next (one vote per pair per voter). Everyone's votes still feed
+   *  the aggregate ELO used for informativeness and the leaderboard. */
+  const userComparisons = useMemo(
+    () =>
+      currentUserId
+        ? list.comparisons.filter((c) => c.voterId === currentUserId)
+        : list.comparisons,
+    [list.comparisons, currentUserId],
+  );
+
   const ratingsById = useMemo(() => {
     const rs = rankElo(list.items, list.comparisons);
     return new Map(rs.map((r) => [r.itemId, r.rating]));
@@ -54,14 +67,14 @@ export function VoteScreen({ list }: Props) {
   }
 
   const pair = useMemo(() => {
-    return nextPair(list.items, list.comparisons, {
+    return nextPair(list.items, userComparisons, {
       strategy: 'informative',
       ratingsById,
     });
     // include nonce so we re-select after each vote even if it matches
-  }, [list.items, list.comparisons, ratingsById, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [list.items, userComparisons, ratingsById, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const remaining = comparisonsRemaining(list.items, list.comparisons);
+  const remaining = comparisonsRemaining(list.items, userComparisons);
 
   function vote(winner: Item, loser: Item) {
     // Capture before/after ratings so we can show the delta.
