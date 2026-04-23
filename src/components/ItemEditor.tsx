@@ -6,6 +6,7 @@ import { UrlPreviewInput } from './UrlPreviewInput';
 import { TmdbSearchInput } from './TmdbSearchInput';
 import { TagInput } from './TagInput';
 import { VoteCard } from './VoteCard';
+import { AudioUploadEditor } from './AudioUploadEditor';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 type Props = {
@@ -271,7 +272,7 @@ function ItemEditorForm({
                   placeholder="https://…/photo.jpg"
                 />
               </Field>
-              <Field label="Audio URL">
+              <Field label="Audio URL" hint="Paste a URL, or upload & trim a clip below">
                 <input
                   className="input"
                   type="url"
@@ -280,6 +281,10 @@ function ItemEditorForm({
                   placeholder="https://…/track.mp3"
                 />
               </Field>
+              <AudioUploadEditor
+                value={draft.audioUrl}
+                onChange={(url) => setDraft((d) => ({ ...d, audioUrl: url }))}
+              />
               <Field label="Video URL">
                 <input
                   className="input"
