@@ -38,8 +38,17 @@ npm run build    # production build
 Optional env vars (create `.env.local`):
 
 ```
-TMDB_API_KEY=...   # enables the "Movie/TV" item picker
+TMDB_API_KEY=...                 # enables the "Movie/TV" item picker
+NEXT_PUBLIC_SUPABASE_URL=...     # override the baked-in Supabase project
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
+
+## Supabase
+
+Auth, data, realtime, and audio uploads all live in a shared Supabase project
+(URL + anon key are committed in `src/lib/supabase/env.ts`). To provision a
+fresh project, run the SQL in [`supabase/schema.sql`](./supabase/schema.sql)
+and follow [`supabase/README.md`](./supabase/README.md).
 
 ## Project layout
 
