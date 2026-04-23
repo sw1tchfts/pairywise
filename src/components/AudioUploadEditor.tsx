@@ -159,7 +159,7 @@ export function AudioUploadEditor({ value, onChange }: Props) {
     }
   }
 
-  function playPreview() {
+  function playRange(fromSec: number, toSec: number) {
     if (!buffer) return;
     stopPreview();
     const audioCtx = getAudioContext();
@@ -167,12 +167,23 @@ export function AudioUploadEditor({ value, onChange }: Props) {
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
     source.connect(audioCtx.destination);
-    const length = Math.max(0.05, endSec - startSec);
-    source.start(0, startSec, length);
+    const from = Math.max(0, Math.min(fromSec, duration));
+    const to = Math.max(from + 0.05, Math.min(toSec, duration));
+    const length = to - from;
+    source.start(0, from, length);
     sourceRef.current = source;
     stopTimerRef.current = window.setTimeout(() => {
       stopPreview();
     }, length * 1000 + 50);
+  }
+
+  function playPreview() {
+    playRange(startSec, endSec);
+  }
+
+  function handleTrackClick(e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest('[role="slider"]')) return;
+    playRange(secondsFromClientX(e.clientX), duration);
   }
 
   useEffect(() => () => stopPreview(), []);
@@ -245,7 +256,8 @@ export function AudioUploadEditor({ value, onChange }: Props) {
         <div className="space-y-2">
           <div
             ref={trackRef}
-            className="relative h-16 rounded-md bg-foreground/5 overflow-hidden select-none"
+            onClick={handleTrackClick}
+            className="relative h-16 rounded-md bg-foreground/5 overflow-hidden select-none cursor-pointer"
           >
             <canvas
               ref={canvasRef}
