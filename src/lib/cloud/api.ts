@@ -384,37 +384,126 @@ export async function deleteItem(itemId: string): Promise<void> {
 
 // ---------- Profiles ----------
 
+export type UserRole = 'user' | 'admin';
+
 export type Profile = {
   userId: string;
   handle: string | null;
   displayName: string | null;
+  role: UserRole;
+  disabledAt: number | null;
 };
 
 type ProfileRow = {
   user_id: string;
   handle: string | null;
   display_name: string | null;
+  role: UserRole | null;
+  disabled_at: string | null;
 };
+
+function profileFromRow(row: ProfileRow): Profile {
+  return {
+    userId: row.user_id,
+    handle: row.handle,
+    displayName: row.display_name,
+    role: (row.role ?? 'user') as UserRole,
+    disabledAt: row.disabled_at ? new Date(row.disabled_at).getTime() : null,
+  };
+}
 
 export async function fetchProfiles(userIds: string[]): Promise<Profile[]> {
   if (userIds.length === 0) return [];
   const supabase = getBrowserClient();
   const { data, error } = await supabase
     .from('profiles')
-    .select('user_id, handle, display_name')
+    .select('user_id, handle, display_name, role, disabled_at')
     .in('user_id', userIds);
   if (error) throw error;
-  return (data ?? []).map((r) => {
-    const row = r as ProfileRow;
-    return { userId: row.user_id, handle: row.handle, displayName: row.display_name };
-  });
+  return (data ?? []).map((r) => profileFromRow(r as ProfileRow));
 }
 
 export async function fetchCurrentProfile(): Promise<Profile | null> {
   const userId = await getCurrentUserId();
   if (!userId) return null;
   const [profile] = await fetchProfiles([userId]);
-  return profile ?? { userId, handle: null, displayName: null };
+  return (
+    profile ?? {
+      userId,
+      handle: null,
+      displayName: null,
+      role: 'user',
+      disabledAt: null,
+    }
+  );
+}
+
+// ---------- Admin ----------
+
+export type AdminUser = {
+  userId: string;
+  email: string | null;
+  handle: string | null;
+  displayName: string | null;
+  role: UserRole;
+  disabledAt: number | null;
+  createdAt: number;
+  lastSignInAt: number | null;
+};
+
+type AdminUserRow = {
+  user_id: string;
+  email: string | null;
+  handle: string | null;
+  display_name: string | null;
+  role: UserRole | null;
+  disabled_at: string | null;
+  created_at: string;
+  last_sign_in_at: string | null;
+};
+
+/** Returns every account (admin-only; RLS/RPC body returns empty for others). */
+export async function fetchAllUsersAdmin(): Promise<AdminUser[]> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.rpc('admin_list_users');
+  if (error) throw error;
+  return ((data ?? []) as AdminUserRow[]).map((r) => ({
+    userId: r.user_id,
+    email: r.email,
+    handle: r.handle,
+    displayName: r.display_name,
+    role: (r.role ?? 'user') as UserRole,
+    disabledAt: r.disabled_at ? new Date(r.disabled_at).getTime() : null,
+    createdAt: new Date(r.created_at).getTime(),
+    lastSignInAt: r.last_sign_in_at ? new Date(r.last_sign_in_at).getTime() : null,
+  }));
+}
+
+/** Admin-only: set a user's role. Enforced at the DB level by RLS + the
+ *  privileged-column trigger on `profiles`. */
+export async function updateUserRole(
+  targetUserId: string,
+  role: UserRole,
+): Promise<void> {
+  const supabase = getBrowserClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role })
+    .eq('user_id', targetUserId);
+  if (error) throw error;
+}
+
+/** Admin-only: disable or re-enable a user by setting `disabled_at`. */
+export async function setUserDisabled(
+  targetUserId: string,
+  disabled: boolean,
+): Promise<void> {
+  const supabase = getBrowserClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ disabled_at: disabled ? new Date().toISOString() : null })
+    .eq('user_id', targetUserId);
+  if (error) throw error;
 }
 
 export async function updateCurrentProfile(patch: {

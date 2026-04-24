@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import { useIsAdmin } from '@/lib/cloud/useIsAdmin';
 import { useToast } from './Toaster';
 
 export function SessionMenu() {
   const router = useRouter();
   const toast = useToast();
   const cloud = isCloudEnabled();
+  const isAdmin = useIsAdmin();
   const [email, setEmail] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(!cloud);
 
@@ -78,6 +80,14 @@ export function SessionMenu() {
         >
           Archived lists
         </Link>
+        {isAdmin && (
+          <Link
+            href="/admin/users"
+            className="block px-3 py-2 rounded hover:bg-foreground/5"
+          >
+            User security
+          </Link>
+        )}
         <button
           type="button"
           onClick={signOut}

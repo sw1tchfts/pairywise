@@ -23,7 +23,13 @@ async function ensureProfiles(userIds: string[]) {
       for (const id of toFetch) {
         cache.set(
           id,
-          byId.get(id) ?? { userId: id, handle: null, displayName: null },
+          byId.get(id) ?? {
+            userId: id,
+            handle: null,
+            displayName: null,
+            role: 'user',
+            disabledAt: null,
+          },
         );
       }
       notify();

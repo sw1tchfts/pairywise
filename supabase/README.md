@@ -16,12 +16,14 @@ What it creates:
 
 | Object | Purpose |
 | --- | --- |
-| `public.profiles` | Per-user handle / display name, auto-created on signup |
+| `public.profiles` | Per-user handle / display name / role / disabled state, auto-created on signup |
 | `public.lists` | Ranking lists (title, visibility, phase, algorithm, etc.) |
 | `public.list_members` | Voters invited to (or self-joined via link) a list |
 | `public.items` | Items in a list (text / image / url / tmdb / media) |
 | `public.comparisons` | A-vs-B votes (one non-skipped vote per voter per unordered pair) |
 | `list_item_counts(uuid)` RPC | Per-user submitted-item counts for a list |
+| `admin_list_users()` RPC | Admin-only view of every account (email, handle, role, sign-in times) |
+| `is_admin(uuid)` helper | Used by RLS and the admin guard trigger |
 | Realtime publication | `comparisons` added to `supabase_realtime` |
 | `audio` storage bucket | Public bucket for uploaded / trimmed audio clips |
 
@@ -34,6 +36,28 @@ All tables have RLS enabled. The policies enforce:
 - **Votes** — only the voter can insert (and only during voting phase, only
   if they have list access). Anyone with list access can read them.
 - **Audio** — public read; users can only write files under their own `<uid>/…` prefix.
+
+## 1b. Bootstrap the first admin
+
+The `profiles.role` column defaults to `'user'`. The RLS policies + the
+`profiles_guard_privileged_cols` trigger prevent anyone from granting
+themselves admin through the app — you have to do it once, from the SQL
+editor (which runs as the `postgres` superuser and bypasses the guard).
+
+Run this **once**, replacing the email, after your account has signed up:
+
+```sql
+update public.profiles
+set role = 'admin'
+where user_id = (
+  select id from auth.users where lower(email) = lower('you@example.com')
+);
+```
+
+After that, sign out and back in — a **User security** link appears in the
+account menu, routing to `/admin/users` where admins can promote / revoke
+other admins and disable accounts. The last remaining active admin cannot
+be demoted or disabled.
 
 ## 2. Configure auth
 
