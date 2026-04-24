@@ -33,12 +33,31 @@ create table if not exists public.profiles (
   user_id       uuid primary key references auth.users(id) on delete cascade,
   handle        text unique,
   display_name  text,
+  role          text not null default 'user'
+                  check (role in ('user', 'admin')),
+  disabled_at   timestamptz,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   constraint profiles_handle_format check (
     handle is null or handle ~ '^[a-z0-9_]{2,32}$'
   )
 );
+
+-- Add columns if the table already existed from a prior deploy.
+alter table public.profiles
+  add column if not exists role text not null default 'user';
+alter table public.profiles
+  add column if not exists disabled_at timestamptz;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'profiles_role_check'
+  ) then
+    alter table public.profiles
+      add constraint profiles_role_check check (role in ('user', 'admin'));
+  end if;
+end
+$$;
 
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
@@ -179,6 +198,21 @@ create unique index if not exists comparisons_unique_pair
 -- Access-check helpers (SECURITY DEFINER to avoid RLS recursion)
 -- ============================================================================
 
+create or replace function public.is_admin(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select role = 'admin' from public.profiles where user_id = p_user),
+    false
+  );
+$$;
+
+grant execute on function public.is_admin(uuid) to authenticated, anon;
+
 create or replace function public.list_is_member(p_list_id uuid, p_user uuid)
 returns boolean
 language sql
@@ -221,6 +255,101 @@ set search_path = public
 as $$
   select phase from public.lists where id = p_list_id;
 $$;
+
+-- ============================================================================
+-- Privileged-column guard on profiles
+-- ============================================================================
+-- RLS works at the row level, not the column level. The self-update policy
+-- lets a user update their own row — so without this trigger, they could also
+-- set `role` to 'admin' or clear their own `disabled_at`. The trigger blocks
+-- any change to those columns unless the acting user is already an admin.
+-- (SECURITY DEFINER is not used here: we want `auth.uid()` of the caller.)
+
+create or replace function public.tg_profiles_guard_privileged_cols()
+returns trigger
+language plpgsql
+as $$
+declare
+  acting uuid := auth.uid();
+begin
+  if new.role is distinct from old.role
+     or new.disabled_at is distinct from old.disabled_at then
+    -- Skip the guard when there's no auth context: SQL editor runs as the
+    -- postgres superuser and the service_role key bypasses RLS. Both are
+    -- trusted by design (you need the database password or service key).
+    if acting is null then
+      return new;
+    end if;
+    if not public.is_admin(acting) then
+      raise exception 'only admins can change role or disabled_at'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  -- Prevent removing the last active admin from the system (demotion or
+  -- self-disable). Runs unconditionally — even a direct SQL update should
+  -- not accidentally lock everyone out.
+  if old.role = 'admin'
+     and (new.role <> 'admin' or new.disabled_at is not null)
+  then
+    if (
+      select count(*) from public.profiles
+      where role = 'admin' and disabled_at is null and user_id <> old.user_id
+    ) = 0 then
+      raise exception 'cannot demote or disable the last remaining admin'
+        using errcode = '42501';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_guard_privileged_cols on public.profiles;
+create trigger profiles_guard_privileged_cols
+  before update on public.profiles
+  for each row execute function public.tg_profiles_guard_privileged_cols();
+
+-- ============================================================================
+-- RPC: admin_list_users
+-- ============================================================================
+-- Admin-only view of every account: joins auth.users (for email + signup time)
+-- to profiles. Callable by anyone who is_admin(); returns empty for everyone
+-- else. The function is SECURITY DEFINER so it can read auth.users, but gated
+-- inside the body.
+
+create or replace function public.admin_list_users()
+returns table (
+  user_id       uuid,
+  email         text,
+  handle        text,
+  display_name  text,
+  role          text,
+  disabled_at   timestamptz,
+  created_at    timestamptz,
+  last_sign_in_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    u.id          as user_id,
+    u.email::text as email,
+    p.handle,
+    p.display_name,
+    p.role,
+    p.disabled_at,
+    u.created_at,
+    u.last_sign_in_at
+  from auth.users u
+  left join public.profiles p on p.user_id = u.id
+  where public.is_admin(auth.uid())
+  order by u.created_at asc;
+$$;
+
+grant execute on function public.admin_list_users() to authenticated;
 
 -- ============================================================================
 -- RPC: list_item_counts
@@ -280,7 +409,10 @@ $$;
 -- ---- profiles ----
 -- Every signed-in user can read profiles (needed to render voter names on
 -- shared lists). Users can only update their own row; inserts are handled by
--- the auth-signup trigger.
+-- the auth-signup trigger. Admins can update any row — used by the admin
+-- user-security page to grant/revoke admin and to disable accounts. A trigger
+-- (below) prevents non-admins from mutating `role` or `disabled_at` even on
+-- their own row.
 create policy profiles_select_all on public.profiles
   for select to authenticated, anon
   using (true);
@@ -288,6 +420,10 @@ create policy profiles_update_self on public.profiles
   for update to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+create policy profiles_update_admin on public.profiles
+  for update to authenticated
+  using (public.is_admin(auth.uid()))
+  with check (public.is_admin(auth.uid()));
 
 -- ---- lists ----
 create policy lists_select_visible on public.lists
