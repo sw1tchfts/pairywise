@@ -434,6 +434,177 @@ export async function updateCurrentProfile(patch: {
   if (error) throw error;
 }
 
+// ---------- Admin ----------
+
+export type AdminUserRow = {
+  userId: string;
+  email: string;
+  handle: string | null;
+  displayName: string | null;
+  isAdmin: boolean;
+  ownedCount: number;
+  memberCount: number;
+  createdAt: number;
+};
+
+export type AdminUserDetail = {
+  userId: string;
+  email: string;
+  handle: string | null;
+  displayName: string | null;
+  isAdmin: boolean;
+  createdAt: number;
+};
+
+export type AdminUserListAccess = {
+  listId: string;
+  title: string;
+  visibility: string;
+  relationship: 'owner' | 'member';
+};
+
+export type AdminJoinableList = {
+  listId: string;
+  title: string;
+  visibility: string;
+};
+
+export async function isCurrentUserAdmin(): Promise<boolean> {
+  const userId = await getCurrentUserId();
+  if (!userId) return false;
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) return false;
+  return Boolean((data as { is_admin?: boolean } | null)?.is_admin);
+}
+
+export async function adminListUsers(): Promise<AdminUserRow[]> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.rpc('admin_list_users');
+  if (error) throw error;
+  type Row = {
+    user_id: string;
+    email: string;
+    handle: string | null;
+    display_name: string | null;
+    is_admin: boolean;
+    owned_count: number;
+    member_count: number;
+    created_at: string;
+  };
+  return ((data ?? []) as Row[]).map((r) => ({
+    userId: r.user_id,
+    email: r.email,
+    handle: r.handle,
+    displayName: r.display_name,
+    isAdmin: r.is_admin,
+    ownedCount: Number(r.owned_count),
+    memberCount: Number(r.member_count),
+    createdAt: new Date(r.created_at).getTime(),
+  }));
+}
+
+export async function adminGetUser(
+  userId: string,
+): Promise<AdminUserDetail | null> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.rpc('admin_get_user', {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  const rows = data as Array<{
+    user_id: string;
+    email: string;
+    handle: string | null;
+    display_name: string | null;
+    is_admin: boolean;
+    created_at: string;
+  }> | null;
+  if (!rows || rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    userId: r.user_id,
+    email: r.email,
+    handle: r.handle,
+    displayName: r.display_name,
+    isAdmin: r.is_admin,
+    createdAt: new Date(r.created_at).getTime(),
+  };
+}
+
+export async function adminUpdateUser(
+  userId: string,
+  patch: {
+    handle?: string | null;
+    displayName?: string | null;
+    isAdmin?: boolean;
+  },
+): Promise<void> {
+  const supabase = getBrowserClient();
+  const update: Record<string, unknown> = {};
+  if ('handle' in patch) update.handle = patch.handle;
+  if ('displayName' in patch) update.display_name = patch.displayName;
+  if ('isAdmin' in patch) update.is_admin = patch.isAdmin;
+  const { error } = await supabase
+    .from('profiles')
+    .update(update)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function adminFetchUserListAccess(
+  userId: string,
+): Promise<AdminUserListAccess[]> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.rpc('admin_user_list_access', {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  type Row = {
+    list_id: string;
+    title: string;
+    visibility: string;
+    relationship: 'owner' | 'member';
+  };
+  return ((data ?? []) as Row[]).map((r) => ({
+    listId: r.list_id,
+    title: r.title,
+    visibility: r.visibility,
+    relationship: r.relationship,
+  }));
+}
+
+export async function adminFetchJoinableLists(
+  userId: string,
+): Promise<AdminJoinableList[]> {
+  const supabase = getBrowserClient();
+  const { data, error } = await supabase.rpc('admin_lists_user_can_join', {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  type Row = { list_id: string; title: string; visibility: string };
+  return ((data ?? []) as Row[]).map((r) => ({
+    listId: r.list_id,
+    title: r.title,
+    visibility: r.visibility,
+  }));
+}
+
+export async function adminAddUserToList(
+  listId: string,
+  userId: string,
+): Promise<void> {
+  const supabase = getBrowserClient();
+  const { error } = await supabase
+    .from('list_members')
+    .insert({ list_id: listId, user_id: userId, role: 'voter' });
+  if (error) throw error;
+}
+
 // ---------- Comparisons ----------
 
 export async function insertComparison(

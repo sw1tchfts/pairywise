@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import * as api from '@/lib/cloud/api';
 import { useToast } from './Toaster';
 
 export function SessionMenu() {
@@ -12,6 +13,7 @@ export function SessionMenu() {
   const cloud = isCloudEnabled();
   const [email, setEmail] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(!cloud);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!cloud) return;
@@ -22,9 +24,21 @@ export function SessionMenu() {
       if (!mounted) return;
       setEmail(data.user?.email ?? null);
       setHydrated(true);
+      if (data.user) {
+        const ok = await api.isCurrentUserAdmin();
+        if (mounted) setIsAdmin(ok);
+      } else {
+        setIsAdmin(false);
+      }
     })();
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setEmail(session?.user?.email ?? null);
+      if (session?.user) {
+        const ok = await api.isCurrentUserAdmin();
+        if (mounted) setIsAdmin(ok);
+      } else {
+        setIsAdmin(false);
+      }
     });
     return () => {
       mounted = false;
@@ -78,6 +92,14 @@ export function SessionMenu() {
         >
           Archived lists
         </Link>
+        {isAdmin && (
+          <Link
+            href="/admin/users"
+            className="block px-3 py-2 rounded hover:bg-foreground/5"
+          >
+            Admin
+          </Link>
+        )}
         <button
           type="button"
           onClick={signOut}

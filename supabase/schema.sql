@@ -571,3 +571,149 @@ set is_admin = true
 where user_id in (
   select id from auth.users where lower(email) = 'phillipklejwa@gmail.com'
 );
+
+-- ============================================================================
+-- Admin RPCs
+-- ============================================================================
+-- These read auth.users.email, which the browser client can't see directly.
+-- SECURITY DEFINER + an in-body is_admin() guard keeps them safe to expose to
+-- the authenticated role.
+
+create or replace function public.admin_list_users()
+returns table (
+  user_id        uuid,
+  email          text,
+  handle         text,
+  display_name   text,
+  is_admin       boolean,
+  owned_count    bigint,
+  member_count   bigint,
+  created_at     timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not coalesce(public.is_admin(auth.uid()), false) then
+    raise exception 'admin only';
+  end if;
+  return query
+    select
+      p.user_id,
+      u.email::text,
+      p.handle,
+      p.display_name,
+      p.is_admin,
+      coalesce(o.cnt, 0)::bigint as owned_count,
+      coalesce(m.cnt, 0)::bigint as member_count,
+      p.created_at
+    from public.profiles p
+    join auth.users u on u.id = p.user_id
+    left join (
+      select owner_id, count(*) as cnt
+      from public.lists
+      group by owner_id
+    ) o on o.owner_id = p.user_id
+    left join (
+      select user_id, count(*) as cnt
+      from public.list_members
+      group by user_id
+    ) m on m.user_id = p.user_id
+    order by p.created_at desc;
+end;
+$$;
+
+grant execute on function public.admin_list_users() to authenticated;
+
+create or replace function public.admin_get_user(p_user_id uuid)
+returns table (
+  user_id       uuid,
+  email         text,
+  handle        text,
+  display_name  text,
+  is_admin      boolean,
+  created_at    timestamptz
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not coalesce(public.is_admin(auth.uid()), false) then
+    raise exception 'admin only';
+  end if;
+  return query
+    select p.user_id, u.email::text, p.handle, p.display_name, p.is_admin, p.created_at
+    from public.profiles p
+    join auth.users u on u.id = p.user_id
+    where p.user_id = p_user_id;
+end;
+$$;
+
+grant execute on function public.admin_get_user(uuid) to authenticated;
+
+-- Lists this user owns or is a member of. `relationship` is 'owner' or 'member'.
+create or replace function public.admin_user_list_access(p_user_id uuid)
+returns table (
+  list_id        uuid,
+  title          text,
+  visibility     text,
+  relationship   text
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not coalesce(public.is_admin(auth.uid()), false) then
+    raise exception 'admin only';
+  end if;
+  return query
+    select l.id, l.title, l.visibility, 'owner'::text
+    from public.lists l where l.owner_id = p_user_id
+    union all
+    select l.id, l.title, l.visibility, 'member'::text
+    from public.list_members m
+    join public.lists l on l.id = m.list_id
+    where m.user_id = p_user_id
+    order by 4 desc, 2 asc;
+end;
+$$;
+
+grant execute on function public.admin_user_list_access(uuid) to authenticated;
+
+-- Lists the admin can drop a user into (the user is not already an owner or
+-- member). Browsable in the edit UI's "Add to list" picker.
+create or replace function public.admin_lists_user_can_join(p_user_id uuid)
+returns table (
+  list_id     uuid,
+  title       text,
+  visibility  text
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not coalesce(public.is_admin(auth.uid()), false) then
+    raise exception 'admin only';
+  end if;
+  return query
+    select l.id, l.title, l.visibility
+    from public.lists l
+    where l.owner_id <> p_user_id
+      and not exists (
+        select 1 from public.list_members m
+        where m.list_id = l.id and m.user_id = p_user_id
+      )
+      and l.archived_at is null
+    order by l.title asc;
+end;
+$$;
+
+grant execute on function public.admin_lists_user_can_join(uuid) to authenticated;
