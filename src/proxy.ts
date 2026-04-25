@@ -62,11 +62,21 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match everything except static assets, OG routes, and TMDB search.
-     * /api/og-list is excluded so bots like Apple's link preview can fetch
-     * the image without hitting the auth gate.
-     */
-    '/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|manifest\\.webmanifest|api/og|api/og-list|api/tmdb).*)',
+    // Match everything except static assets, OG routes, and TMDB search, AND
+    // skip Next.js prefetch requests. Without the `missing` clause, every
+    // <Link> in the viewport triggers a prefetch that runs this middleware,
+    // each of which calls supabase.auth.getUser() — on Vercel's Edge runtime
+    // the resulting fan-out blows the per-worker DNS cache and returns 503
+    // "DNS cache overflow". The auth check on the actual navigation still
+    // runs; we just don't run it on speculative prefetches.
+    // /api/og-list is excluded so link unfurlers can fetch unauthenticated.
+    {
+      source:
+        '/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|manifest\\.webmanifest|api/og|api/og-list|api/tmdb).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' },
+      ],
+    },
   ],
 };

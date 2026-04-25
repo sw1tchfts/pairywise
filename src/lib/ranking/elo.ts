@@ -1,6 +1,6 @@
 import type { Comparison, Item, Ranking } from '../types';
 
-export type EloOptions = {
+type EloOptions = {
   kFactor?: number;
   initialRating?: number;
   initialDeviation?: number;

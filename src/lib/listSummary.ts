@@ -2,7 +2,7 @@ import { comparisonsRemaining } from './ranking/pairSelection';
 import { rankElo } from './ranking/elo';
 import type { RankList } from './types';
 
-export type ListSummary = {
+type ListSummary = {
   listId: string;
   topItems: { title: string; score: number }[];
   pairsDone: number;

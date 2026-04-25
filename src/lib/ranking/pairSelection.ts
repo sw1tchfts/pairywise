@@ -1,6 +1,6 @@
 import type { Comparison, Item } from '../types';
 
-export type PairSelectionOptions = {
+type PairSelectionOptions = {
   random?: () => number;
   strategy?: 'coverage' | 'informative';
   ratingsById?: Map<string, number>;

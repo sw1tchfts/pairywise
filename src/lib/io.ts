@@ -2,7 +2,7 @@ import { ListSchema, type RankList } from './types';
 
 const EXPORT_VERSION = 1;
 
-export type Exported = {
+type Exported = {
   format: 'pairywise-list';
   version: number;
   exportedAt: number;

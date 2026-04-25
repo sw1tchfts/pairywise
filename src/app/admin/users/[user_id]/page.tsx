@@ -36,21 +36,24 @@ export default function AdminUserEditPage({
     let cancelled = false;
     (async () => {
       try {
-        const [u, me] = await Promise.all([
+        const [u, me, a, j] = await Promise.all([
           api.adminGetUser(userId),
           api.getCurrentUserId(),
+          api.adminFetchUserListAccess(userId),
+          api.adminFetchJoinableLists(userId),
         ]);
         if (cancelled) return;
+        setCurrentUserId(me);
+        setAccess(a);
+        setJoinable(j);
         if (!u) {
           setUser(null);
-          setLoading(false);
           return;
         }
         setUser(u);
         setHandle(u.handle ?? '');
         setDisplayName(u.displayName ?? '');
         setIsAdmin(u.isAdmin);
-        setCurrentUserId(me);
       } catch (err) {
         if (cancelled) return;
         toast.push(err instanceof Error ? err.message : 'Failed to load user', {
@@ -74,31 +77,6 @@ export default function AdminUserEditPage({
     setJoinable(j);
     setPickedListId('');
   }
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [a, j] = await Promise.all([
-          api.adminFetchUserListAccess(userId),
-          api.adminFetchJoinableLists(userId),
-        ]);
-        if (cancelled) return;
-        setAccess(a);
-        setJoinable(j);
-      } catch (err) {
-        if (cancelled) return;
-        toast.push(
-          err instanceof Error ? err.message : 'Failed to load list access',
-          { kind: 'error' },
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, userId, toast]);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -239,7 +217,7 @@ export default function AdminUserEditPage({
         <div>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || currentUserId === null}
             className="px-4 py-2 rounded-md bg-foreground text-background font-medium text-sm disabled:opacity-40"
           >
             {saving ? 'Saving…' : 'Save'}

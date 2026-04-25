@@ -17,6 +17,7 @@ create extension if not exists "pgcrypto";
 create or replace function public.tg_set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -121,8 +122,6 @@ create table if not exists public.lists (
 
 create index if not exists lists_owner_id_idx
   on public.lists (owner_id, updated_at desc);
-create index if not exists lists_visibility_idx
-  on public.lists (visibility) where visibility <> 'private';
 
 drop trigger if exists lists_set_updated_at on public.lists;
 create trigger lists_set_updated_at
@@ -173,6 +172,10 @@ create index if not exists items_list_position_idx
   on public.items (list_id, position);
 create index if not exists items_list_creator_idx
   on public.items (list_id, created_by);
+-- Covers the FK on items.created_by; cascading deletes on auth.users would
+-- otherwise need a sequential scan.
+create index if not exists items_created_by_idx
+  on public.items (created_by);
 
 -- ============================================================================
 -- comparisons
@@ -189,10 +192,15 @@ create table if not exists public.comparisons (
   constraint comparisons_different_items check (winner_id <> loser_id)
 );
 
-create index if not exists comparisons_list_idx
-  on public.comparisons (list_id, created_at);
+-- Covering indexes for the foreign keys (lookups for cascading deletes,
+-- joins, and per-side filters). The composite index on (voter_id, list_id)
+-- doubles as the FK cover for voter_id.
 create index if not exists comparisons_voter_idx
   on public.comparisons (voter_id, list_id);
+create index if not exists comparisons_winner_idx
+  on public.comparisons (winner_id);
+create index if not exists comparisons_loser_idx
+  on public.comparisons (loser_id);
 
 -- At most one non-skipped vote per (list, voter, unordered pair). Skips can
 -- repeat — they're how "show me something else" is logged.
@@ -372,20 +380,18 @@ create policy list_members_select on public.list_members
     or public.list_owner_id(list_id) = (select auth.uid())
     or (select public.is_admin((select auth.uid())))
   );
--- Self-join: any authenticated user can add themselves as a voter, but only
--- to a list that is unlisted/public (RLS on lists would otherwise hide it).
-create policy list_members_insert_self on public.list_members
+-- Insert: either you're adding yourself as a voter to an unlisted/public list
+-- (self-join), or you're the owner / platform admin adding anyone. Single
+-- permissive policy so Postgres only evaluates the check once per row.
+create policy list_members_insert on public.list_members
   for insert to authenticated
   with check (
-    user_id = (select auth.uid())
-    and role = 'voter'
-    and public.list_visibility(list_id) in ('unlisted', 'public')
-  );
--- Owners (and platform admins) can add members directly.
-create policy list_members_insert_by_owner on public.list_members
-  for insert to authenticated
-  with check (
-    public.list_owner_id(list_id) = (select auth.uid())
+    (
+      user_id = (select auth.uid())
+      and role = 'voter'
+      and public.list_visibility(list_id) in ('unlisted', 'public')
+    )
+    or public.list_owner_id(list_id) = (select auth.uid())
     or (select public.is_admin((select auth.uid())))
   );
 -- A user can leave; the owner or an admin can remove anyone.
@@ -534,11 +540,10 @@ begin
 end
 $$;
 
--- Public read.
-create policy audio_public_read on storage.objects
-  for select to authenticated, anon
-  using (bucket_id = 'audio');
-
+-- No SELECT policy: the bucket is `public`, so its files are served via
+-- the public CDN endpoint without going through RLS on storage.objects.
+-- The app only ever calls `storage.from('audio').getPublicUrl(...)`, never
+-- `.list()` or `.download()`, so there's nothing to authorize through RLS.
 -- A user can only write under their own prefix: <user_id>/...
 create policy audio_insert_self on storage.objects
   for insert to authenticated

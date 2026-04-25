@@ -456,7 +456,3 @@ export const useStore = create<State & Actions>()((set, get) => ({
     return newListId;
   },
 }));
-
-export function selectList(id: string) {
-  return (s: State) => s.lists[id];
-}
