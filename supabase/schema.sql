@@ -327,6 +327,11 @@ $$;
 -- Every signed-in user can read profiles (needed to render voter names on
 -- shared lists). Users can only update their own row; inserts are handled by
 -- the auth-signup trigger.
+--
+-- All `auth.uid()` calls are wrapped in `(select auth.uid())` so Postgres
+-- treats them as InitPlan constants instead of re-evaluating per row. Same
+-- pattern for `public.is_admin(...)` since it queries profiles internally.
+-- See https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select
 create policy profiles_select_all on public.profiles
   for select to authenticated, anon
   using (true);
@@ -334,28 +339,28 @@ create policy profiles_select_all on public.profiles
 -- guarded by tg_profiles_guard_is_admin so non-admins can't promote themselves.
 create policy profiles_update_self on public.profiles
   for update to authenticated
-  using (user_id = auth.uid() or public.is_admin(auth.uid()))
-  with check (user_id = auth.uid() or public.is_admin(auth.uid()));
+  using (user_id = (select auth.uid()) or (select public.is_admin((select auth.uid()))))
+  with check (user_id = (select auth.uid()) or (select public.is_admin((select auth.uid()))));
 
 -- ---- lists ----
 create policy lists_select_visible on public.lists
   for select to authenticated, anon
   using (
     visibility <> 'private'
-    or owner_id = auth.uid()
-    or public.list_is_member(id, auth.uid())
-    or public.is_admin(auth.uid())
+    or owner_id = (select auth.uid())
+    or public.list_is_member(id, (select auth.uid()))
+    or (select public.is_admin((select auth.uid())))
   );
 create policy lists_insert_own on public.lists
   for insert to authenticated
-  with check (owner_id = auth.uid());
+  with check (owner_id = (select auth.uid()));
 create policy lists_update_own on public.lists
   for update to authenticated
-  using (owner_id = auth.uid() or public.is_admin(auth.uid()))
-  with check (owner_id = auth.uid() or public.is_admin(auth.uid()));
+  using (owner_id = (select auth.uid()) or (select public.is_admin((select auth.uid()))))
+  with check (owner_id = (select auth.uid()) or (select public.is_admin((select auth.uid()))));
 create policy lists_delete_own on public.lists
   for delete to authenticated
-  using (owner_id = auth.uid() or public.is_admin(auth.uid()));
+  using (owner_id = (select auth.uid()) or (select public.is_admin((select auth.uid()))));
 
 -- ---- list_members ----
 -- A user can see their own membership rows, and the list owner can see all
@@ -363,16 +368,16 @@ create policy lists_delete_own on public.lists
 create policy list_members_select on public.list_members
   for select to authenticated
   using (
-    user_id = auth.uid()
-    or public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    user_id = (select auth.uid())
+    or public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
   );
 -- Self-join: any authenticated user can add themselves as a voter, but only
 -- to a list that is unlisted/public (RLS on lists would otherwise hide it).
 create policy list_members_insert_self on public.list_members
   for insert to authenticated
   with check (
-    user_id = auth.uid()
+    user_id = (select auth.uid())
     and role = 'voter'
     and public.list_visibility(list_id) in ('unlisted', 'public')
   );
@@ -380,16 +385,16 @@ create policy list_members_insert_self on public.list_members
 create policy list_members_insert_by_owner on public.list_members
   for insert to authenticated
   with check (
-    public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
   );
 -- A user can leave; the owner or an admin can remove anyone.
 create policy list_members_delete on public.list_members
   for delete to authenticated
   using (
-    user_id = auth.uid()
-    or public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    user_id = (select auth.uid())
+    or public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
   );
 
 -- ---- items ----
@@ -399,17 +404,17 @@ create policy list_members_delete on public.list_members
 create policy items_select on public.items
   for select to authenticated, anon
   using (
-    public.is_admin(auth.uid())
+    (select public.is_admin((select auth.uid())))
     or (
       (
-        public.list_owner_id(list_id) = auth.uid()
-        or public.list_is_member(list_id, auth.uid())
+        public.list_owner_id(list_id) = (select auth.uid())
+        or public.list_is_member(list_id, (select auth.uid()))
         or public.list_visibility(list_id) <> 'private'
       )
       and (
         public.list_phase(list_id) = 'voting'
-        or public.list_owner_id(list_id) = auth.uid()
-        or created_by = auth.uid()
+        or public.list_owner_id(list_id) = (select auth.uid())
+        or created_by = (select auth.uid())
       )
     )
   );
@@ -418,10 +423,10 @@ create policy items_select on public.items
 create policy items_insert on public.items
   for insert to authenticated
   with check (
-    public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
     or (
-      public.list_is_member(list_id, auth.uid())
+      public.list_is_member(list_id, (select auth.uid()))
       and public.list_phase(list_id) = 'submission'
     )
   );
@@ -430,28 +435,28 @@ create policy items_insert on public.items
 create policy items_update on public.items
   for update to authenticated
   using (
-    public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
     or (
-      created_by = auth.uid()
+      created_by = (select auth.uid())
       and public.list_phase(list_id) = 'submission'
     )
   )
   with check (
-    public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
     or (
-      created_by = auth.uid()
+      created_by = (select auth.uid())
       and public.list_phase(list_id) = 'submission'
     )
   );
 create policy items_delete on public.items
   for delete to authenticated
   using (
-    public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
     or (
-      created_by = auth.uid()
+      created_by = (select auth.uid())
       and public.list_phase(list_id) = 'submission'
     )
   );
@@ -463,28 +468,28 @@ create policy items_delete on public.items
 create policy comparisons_select on public.comparisons
   for select to authenticated, anon
   using (
-    public.list_owner_id(list_id) = auth.uid()
-    or public.list_is_member(list_id, auth.uid())
+    public.list_owner_id(list_id) = (select auth.uid())
+    or public.list_is_member(list_id, (select auth.uid()))
     or public.list_visibility(list_id) <> 'private'
-    or public.is_admin(auth.uid())
+    or (select public.is_admin((select auth.uid())))
   );
 create policy comparisons_insert on public.comparisons
   for insert to authenticated
   with check (
-    voter_id = auth.uid()
+    voter_id = (select auth.uid())
     and public.list_phase(list_id) = 'voting'
     and (
-      public.list_owner_id(list_id) = auth.uid()
-      or public.list_is_member(list_id, auth.uid())
+      public.list_owner_id(list_id) = (select auth.uid())
+      or public.list_is_member(list_id, (select auth.uid()))
       or public.list_visibility(list_id) <> 'private'
     )
   );
 create policy comparisons_delete on public.comparisons
   for delete to authenticated
   using (
-    voter_id = auth.uid()
-    or public.list_owner_id(list_id) = auth.uid()
-    or public.is_admin(auth.uid())
+    voter_id = (select auth.uid())
+    or public.list_owner_id(list_id) = (select auth.uid())
+    or (select public.is_admin((select auth.uid())))
   );
 
 -- ============================================================================
