@@ -2,7 +2,6 @@
 
 import type {
   Algorithm,
-  Bracket,
   Comparison,
   Item,
   Phase,
@@ -192,13 +191,6 @@ export async function removeListMember(
   if (error) throw error;
 }
 
-/** Current user leaves the list. */
-export async function leaveList(listId: string): Promise<void> {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error('Not authenticated.');
-  await removeListMember(listId, userId);
-}
-
 // ---------- Lists ----------
 
 export async function insertList(list: RankList): Promise<void> {
@@ -327,18 +319,6 @@ export async function updateDirectRatings(
   const { error } = await supabase
     .from('lists')
     .update({ direct_ratings: directRatings })
-    .eq('id', listId);
-  if (error) throw error;
-}
-
-export async function updateBracket(
-  listId: string,
-  bracket: Bracket | null,
-): Promise<void> {
-  const supabase = getBrowserClient();
-  const { error } = await supabase
-    .from('lists')
-    .update({ bracket })
     .eq('id', listId);
   if (error) throw error;
 }
@@ -478,7 +458,10 @@ export async function isCurrentUserAdmin(): Promise<boolean> {
     .select('is_admin')
     .eq('user_id', userId)
     .maybeSingle();
-  if (error) return false;
+  if (error) {
+    console.warn('[isCurrentUserAdmin] profiles lookup failed:', error.message);
+    return false;
+  }
   return Boolean((data as { is_admin?: boolean } | null)?.is_admin);
 }
 
@@ -601,7 +584,10 @@ export async function adminAddUserToList(
   const supabase = getBrowserClient();
   const { error } = await supabase
     .from('list_members')
-    .insert({ list_id: listId, user_id: userId, role: 'voter' });
+    .upsert(
+      { list_id: listId, user_id: userId, role: 'voter' },
+      { onConflict: 'list_id,user_id' },
+    );
   if (error) throw error;
 }
 

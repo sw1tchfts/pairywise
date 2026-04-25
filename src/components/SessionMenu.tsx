@@ -31,7 +31,12 @@ export function SessionMenu() {
         setIsAdmin(false);
       }
     })();
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Only react to actual sign-in/out. TOKEN_REFRESHED fires every hour
+      // and on every tab focus; without this filter we'd re-query profiles
+      // (and re-render the admin Link, retriggering its prefetch) constantly.
+      if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') return;
+      if (!mounted) return;
       setEmail(session?.user?.email ?? null);
       if (session?.user) {
         const ok = await api.isCurrentUserAdmin();

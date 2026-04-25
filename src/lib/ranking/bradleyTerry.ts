@@ -1,6 +1,6 @@
 import type { Comparison, Item, Ranking } from '../types';
 
-export type BradleyTerryOptions = {
+type BradleyTerryOptions = {
   maxIterations?: number;
   tolerance?: number;
   prior?: number;
