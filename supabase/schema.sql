@@ -33,6 +33,7 @@ create table if not exists public.profiles (
   user_id       uuid primary key references auth.users(id) on delete cascade,
   handle        text unique,
   display_name  text,
+  is_admin      boolean not null default false,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   constraint profiles_handle_format check (
@@ -40,10 +41,39 @@ create table if not exists public.profiles (
   )
 );
 
+-- Backfill the admin flag on installs that pre-date this column.
+alter table public.profiles
+  add column if not exists is_admin boolean not null default false;
+
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute function public.tg_set_updated_at();
+
+-- Block non-admins from promoting themselves (or anyone else). Only an
+-- existing admin (or a server-side script with no JWT) can flip is_admin.
+-- A null auth.uid() means we're running outside a user request (SQL editor,
+-- service role, migration), so the trigger gets out of the way.
+create or replace function public.tg_profiles_guard_is_admin()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.is_admin is distinct from old.is_admin
+     and auth.uid() is not null
+     and not coalesce(public.is_admin(auth.uid()), false) then
+    raise exception 'Only admins can change is_admin';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_guard_is_admin on public.profiles;
+create trigger profiles_guard_is_admin
+  before update on public.profiles
+  for each row execute function public.tg_profiles_guard_is_admin();
 
 -- Create the profile row automatically whenever a new auth user signs up.
 create or replace function public.tg_create_profile_for_new_user()
@@ -222,6 +252,22 @@ as $$
   select phase from public.lists where id = p_list_id;
 $$;
 
+-- Platform-wide super-user check. Returns false for null / unknown users.
+create or replace function public.is_admin(p_user uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(
+    (select is_admin from public.profiles where user_id = p_user),
+    false
+  );
+$$;
+
+grant execute on function public.is_admin(uuid) to anon, authenticated;
+
 -- ============================================================================
 -- RPC: list_item_counts
 -- ============================================================================
@@ -284,10 +330,12 @@ $$;
 create policy profiles_select_all on public.profiles
   for select to authenticated, anon
   using (true);
+-- Self-update OR admin-update-anyone. The is_admin column is additionally
+-- guarded by tg_profiles_guard_is_admin so non-admins can't promote themselves.
 create policy profiles_update_self on public.profiles
   for update to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = auth.uid() or public.is_admin(auth.uid()))
+  with check (user_id = auth.uid() or public.is_admin(auth.uid()));
 
 -- ---- lists ----
 create policy lists_select_visible on public.lists
@@ -296,17 +344,18 @@ create policy lists_select_visible on public.lists
     visibility <> 'private'
     or owner_id = auth.uid()
     or public.list_is_member(id, auth.uid())
+    or public.is_admin(auth.uid())
   );
 create policy lists_insert_own on public.lists
   for insert to authenticated
   with check (owner_id = auth.uid());
 create policy lists_update_own on public.lists
   for update to authenticated
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid());
+  using (owner_id = auth.uid() or public.is_admin(auth.uid()))
+  with check (owner_id = auth.uid() or public.is_admin(auth.uid()));
 create policy lists_delete_own on public.lists
   for delete to authenticated
-  using (owner_id = auth.uid());
+  using (owner_id = auth.uid() or public.is_admin(auth.uid()));
 
 -- ---- list_members ----
 -- A user can see their own membership rows, and the list owner can see all
@@ -316,6 +365,7 @@ create policy list_members_select on public.list_members
   using (
     user_id = auth.uid()
     or public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
   );
 -- Self-join: any authenticated user can add themselves as a voter, but only
 -- to a list that is unlisted/public (RLS on lists would otherwise hide it).
@@ -326,16 +376,20 @@ create policy list_members_insert_self on public.list_members
     and role = 'voter'
     and public.list_visibility(list_id) in ('unlisted', 'public')
   );
--- Owners can add members directly (e.g. future admin UI).
+-- Owners (and platform admins) can add members directly.
 create policy list_members_insert_by_owner on public.list_members
   for insert to authenticated
-  with check (public.list_owner_id(list_id) = auth.uid());
--- A user can leave; the owner can remove anyone.
+  with check (
+    public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
+  );
+-- A user can leave; the owner or an admin can remove anyone.
 create policy list_members_delete on public.list_members
   for delete to authenticated
   using (
     user_id = auth.uid()
     or public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
   );
 
 -- ---- items ----
@@ -345,33 +399,39 @@ create policy list_members_delete on public.list_members
 create policy items_select on public.items
   for select to authenticated, anon
   using (
-    (
-      public.list_owner_id(list_id) = auth.uid()
-      or public.list_is_member(list_id, auth.uid())
-      or public.list_visibility(list_id) <> 'private'
-    )
-    and (
-      public.list_phase(list_id) = 'voting'
-      or public.list_owner_id(list_id) = auth.uid()
-      or created_by = auth.uid()
+    public.is_admin(auth.uid())
+    or (
+      (
+        public.list_owner_id(list_id) = auth.uid()
+        or public.list_is_member(list_id, auth.uid())
+        or public.list_visibility(list_id) <> 'private'
+      )
+      and (
+        public.list_phase(list_id) = 'voting'
+        or public.list_owner_id(list_id) = auth.uid()
+        or created_by = auth.uid()
+      )
     )
   );
--- Owners can add items any time; members can add during submission phase.
+-- Owners (and admins) can add items any time; members can add during
+-- submission phase.
 create policy items_insert on public.items
   for insert to authenticated
   with check (
     public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
     or (
       public.list_is_member(list_id, auth.uid())
       and public.list_phase(list_id) = 'submission'
     )
   );
--- Owner can edit/delete anything; a creator can edit/delete their own items
--- while the list is in submission phase.
+-- Owner / admin can edit/delete anything; a creator can edit/delete their
+-- own items while the list is in submission phase.
 create policy items_update on public.items
   for update to authenticated
   using (
     public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
     or (
       created_by = auth.uid()
       and public.list_phase(list_id) = 'submission'
@@ -379,6 +439,7 @@ create policy items_update on public.items
   )
   with check (
     public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
     or (
       created_by = auth.uid()
       and public.list_phase(list_id) = 'submission'
@@ -388,6 +449,7 @@ create policy items_delete on public.items
   for delete to authenticated
   using (
     public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
     or (
       created_by = auth.uid()
       and public.list_phase(list_id) = 'submission'
@@ -404,6 +466,7 @@ create policy comparisons_select on public.comparisons
     public.list_owner_id(list_id) = auth.uid()
     or public.list_is_member(list_id, auth.uid())
     or public.list_visibility(list_id) <> 'private'
+    or public.is_admin(auth.uid())
   );
 create policy comparisons_insert on public.comparisons
   for insert to authenticated
@@ -421,6 +484,7 @@ create policy comparisons_delete on public.comparisons
   using (
     voter_id = auth.uid()
     or public.list_owner_id(list_id) = auth.uid()
+    or public.is_admin(auth.uid())
   );
 
 -- ============================================================================
@@ -493,3 +557,17 @@ create policy audio_delete_self on storage.objects
     bucket_id = 'audio'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- ============================================================================
+-- Bootstrap admin
+-- ============================================================================
+-- Promote the project owner. Run from the SQL editor or as service role:
+-- auth.uid() is null in those contexts, so tg_profiles_guard_is_admin lets
+-- the update through. If the target user hasn't signed up yet, this is a
+-- no-op — re-run the script after they create their account.
+
+update public.profiles
+set is_admin = true
+where user_id in (
+  select id from auth.users where lower(email) = 'phillipklejwa@gmail.com'
+);

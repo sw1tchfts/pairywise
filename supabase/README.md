@@ -34,6 +34,11 @@ All tables have RLS enabled. The policies enforce:
 - **Votes** — only the voter can insert (and only during voting phase, only
   if they have list access). Anyone with list access can read them.
 - **Audio** — public read; users can only write files under their own `<uid>/…` prefix.
+- **Admin** — `profiles.is_admin = true` grants platform-wide read on every
+  list / item / comparison and write on lists, items, list_members, and
+  profiles. The `is_admin` column itself is guarded by a trigger so only an
+  existing admin (or a server-side script with no JWT) can change it. The
+  bootstrap at the bottom of `schema.sql` promotes `phillipklejwa@gmail.com`.
 
 ## 2. Configure auth
 
