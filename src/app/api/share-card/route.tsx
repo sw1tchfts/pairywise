@@ -1,8 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { hasSupabaseEnv, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
+import { hasSupabaseEnv } from '@/lib/supabase/env';
 import {
   comparisonFromRow,
   itemFromRow,
@@ -12,12 +10,16 @@ import {
   type ListRow,
 } from '@/lib/cloud/mappers';
 import { rankElo } from '@/lib/ranking/elo';
+import {
+  OGFrame,
+  OG_HEIGHT,
+  OG_PALETTE,
+  OG_WIDTH,
+  getOgSupabase,
+} from '../_og/frame';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const WIDTH = 1200;
-const HEIGHT = 630;
 
 export async function GET(request: NextRequest) {
   const listId = request.nextUrl.searchParams.get('listId');
@@ -28,15 +30,7 @@ export async function GET(request: NextRequest) {
     return new Response('Not configured', { status: 500 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: () => {
-        /* read-only */
-      },
-    },
-  });
+  const supabase = await getOgSupabase(true);
 
   const { data: listRow } = await supabase
     .from('lists')
@@ -78,18 +72,7 @@ export async function GET(request: NextRequest) {
 
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#0b0b0c',
-          color: '#fafafa',
-          padding: '56px 64px',
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-        }}
-      >
+      <OGFrame padding="56px 64px" footerRight="Rank anything">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
           <span
             style={{
@@ -134,7 +117,7 @@ export async function GET(request: NextRequest) {
           }}
         >
           {top.length === 0 ? (
-            <div style={{ color: '#666', fontSize: 28 }}>
+            <div style={{ color: OG_PALETTE.footer, fontSize: 28 }}>
               No ranking data yet.
             </div>
           ) : (
@@ -152,7 +135,7 @@ export async function GET(request: NextRequest) {
                   style={{
                     width: 52,
                     textAlign: 'right',
-                    color: '#666',
+                    color: OG_PALETTE.footer,
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
@@ -161,7 +144,7 @@ export async function GET(request: NextRequest) {
                 <span
                   style={{
                     flex: 1,
-                    color: '#fafafa',
+                    color: OG_PALETTE.fg,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -171,7 +154,7 @@ export async function GET(request: NextRequest) {
                 </span>
                 <span
                   style={{
-                    color: '#888',
+                    color: OG_PALETTE.faint,
                     fontVariantNumeric: 'tabular-nums',
                     fontSize: 24,
                   }}
@@ -182,22 +165,8 @@ export async function GET(request: NextRequest) {
             ))
           )}
         </div>
-
-        <div
-          style={{
-            marginTop: 16,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: '#666',
-            fontSize: 22,
-          }}
-        >
-          <span>pairywise.com</span>
-          <span>Rank anything</span>
-        </div>
-      </div>
+      </OGFrame>
     ),
-    { width: WIDTH, height: HEIGHT },
+    { width: OG_WIDTH, height: OG_HEIGHT },
   );
 }
