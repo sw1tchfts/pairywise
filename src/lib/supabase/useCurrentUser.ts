@@ -1,16 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getBrowserClient, isCloudEnabled } from './browser';
+import { getBrowserClient } from './browser';
 
 export function useCurrentUserId(): string | null | undefined {
   // undefined = still loading; null = signed out; string = signed in
-  const [userId, setUserId] = useState<string | null | undefined>(() =>
-    isCloudEnabled() ? undefined : null,
-  );
+  const [userId, setUserId] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (!isCloudEnabled()) return;
     const supabase = getBrowserClient();
     let mounted = true;
     (async () => {

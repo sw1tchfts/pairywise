@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import { getBrowserClient } from '@/lib/supabase/browser';
 import { comparisonFromRow, type ComparisonRow } from './mappers';
 import type { Comparison } from '@/lib/types';
 
@@ -13,7 +13,7 @@ import type { Comparison } from '@/lib/types';
  */
 export function useListRealtime(listId: string | undefined) {
   useEffect(() => {
-    if (!listId || !isCloudEnabled()) return;
+    if (!listId) return;
     const supabase = getBrowserClient();
     const channel = supabase
       .channel(`list:${listId}`)

@@ -25,11 +25,9 @@ type ToastContext = {
 
 const Ctx = createContext<ToastContext | null>(null);
 
-export function useToast() {
+export function useToast(): ToastContext {
   const ctx = useContext(Ctx);
-  if (!ctx) {
-    return { push: () => {} } as ToastContext;
-  }
+  if (!ctx) throw new Error('useToast must be used inside <Toaster>');
   return ctx;
 }
 

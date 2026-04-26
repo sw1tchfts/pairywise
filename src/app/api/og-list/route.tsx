@@ -1,6 +1,5 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
-import { hasSupabaseEnv } from '@/lib/supabase/env';
 import type { ItemRow, ListRow } from '@/lib/cloud/mappers';
 import {
   OGFrame,
@@ -22,7 +21,6 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const listId = request.nextUrl.searchParams.get('listId');
   if (!listId) return new Response('Missing listId', { status: 400 });
-  if (!hasSupabaseEnv()) return new Response('Not configured', { status: 500 });
 
   // Anon-role: no cookies, RLS lets through non-private lists.
   const supabase = await getOgSupabase(false);

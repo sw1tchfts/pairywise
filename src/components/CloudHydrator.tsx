@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import { getBrowserClient } from '@/lib/supabase/browser';
 import type { RankList } from '@/lib/types';
 
 const PUBLIC_PATHS = ['/signin', '/signup'];
@@ -33,12 +33,10 @@ export function CloudHydrator({
   const hydrated = useStore((s) => s.hydrated);
   const hydrateError = useStore((s) => s.hydrateError);
   const pathname = usePathname();
-  const cloud = isCloudEnabled();
 
   // If the server resolved a user, trust that as the initial signed-in
   // state. Avoids an SSR/client mismatch flash when the page renders.
   const [signedIn, setSignedIn] = useState<boolean | null>(() => {
-    if (!cloud) return false;
     if (initialUserId) return true;
     return null;
   });
@@ -52,7 +50,6 @@ export function CloudHydrator({
   }
 
   useEffect(() => {
-    if (!cloud) return;
     const supabase = getBrowserClient();
     let mounted = true;
 
@@ -84,7 +81,7 @@ export function CloudHydrator({
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [cloud, hydrate, reset, initialLists, initialUserId, setHydratedFromServer]);
+  }, [hydrate, reset, initialLists, initialUserId, setHydratedFromServer]);
 
   if (isPublicPath(pathname)) return <>{children}</>;
 

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { hasSupabaseEnv, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
+import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
 
 /**
  * Supabase sends the user here after they click the email confirmation link.
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const next = url.searchParams.get('next') ?? '/';
   const destination = new URL(next, url.origin);
 
-  if (!code || !hasSupabaseEnv()) {
+  if (!code) {
     return NextResponse.redirect(destination);
   }
 

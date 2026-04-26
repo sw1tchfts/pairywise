@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { hasSupabaseEnv } from '@/lib/supabase/env';
 
 // Signed-in users are redirected away from these (back to /).
 const SIGNED_IN_DISALLOWED = ['/signin', '/signup'];
@@ -29,10 +28,6 @@ function hasAuthCookie(request: NextRequest): boolean {
 }
 
 export function proxy(request: NextRequest) {
-  if (!hasSupabaseEnv()) {
-    return NextResponse.next({ request });
-  }
-
   const signedIn = hasAuthCookie(request);
   const { pathname } = request.nextUrl;
 

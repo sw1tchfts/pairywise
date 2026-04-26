@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import { getBrowserClient } from '@/lib/supabase/browser';
 import { useToast } from './Toaster';
 import { errorMessage } from '@/lib/utils';
 
@@ -66,17 +66,6 @@ export function AuthForm({ mode }: { mode: Mode }) {
     } finally {
       setPending(false);
     }
-  }
-
-  if (!isCloudEnabled()) {
-    return (
-      <div className="mx-auto max-w-sm px-4 sm:px-6 py-10 sm:py-14 text-center">
-        <h1 className="text-2xl font-semibold mb-2">Auth not configured</h1>
-        <p className="text-sm text-foreground/60">
-          The cloud backend is not connected on this deployment yet.
-        </p>
-      </div>
-    );
   }
 
   if (needsConfirm) {

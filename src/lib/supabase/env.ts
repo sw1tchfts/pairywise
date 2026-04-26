@@ -15,7 +15,3 @@ export function supabaseUrl(): string {
 export function supabaseAnonKey(): string {
   return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? DEFAULT_SUPABASE_ANON_KEY;
 }
-
-export function hasSupabaseEnv(): boolean {
-  return Boolean(supabaseUrl() && supabaseAnonKey());
-}

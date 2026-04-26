@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import { getBrowserClient } from '@/lib/supabase/browser';
 
 export function HeaderActions() {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
-    if (!isCloudEnabled()) return;
     const supabase = getBrowserClient();
     let mounted = true;
     (async () => {

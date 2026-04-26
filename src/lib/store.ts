@@ -249,7 +249,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
         },
       };
     });
-    api.updateListPhase(id, phase).catch((e) => reportCloudError('setPhase', e));
+    api.updateListFields(id, { phase }).catch((e) => reportCloudError('setPhase', e));
   },
 
   addItem: (listId, item) => {

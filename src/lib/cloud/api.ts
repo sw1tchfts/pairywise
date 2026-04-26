@@ -4,7 +4,6 @@ import type {
   Algorithm,
   Comparison,
   Item,
-  Phase,
   RankList,
   Tier,
 } from '../types';
@@ -185,10 +184,6 @@ export async function updateListFields(
   if ('phase' in patch) update.phase = patch.phase;
   const { error } = await supabase.from('lists').update(update).eq('id', listId);
   if (error) throw error;
-}
-
-export async function updateListPhase(listId: string, phase: Phase): Promise<void> {
-  return updateListFields(listId, { phase });
 }
 
 export type ItemCountRow = { userId: string; count: number };
