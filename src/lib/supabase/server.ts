@@ -9,8 +9,9 @@ import { supabaseAnonKey, supabaseUrl } from './env';
  * queries on behalf of the signed-in user.
  *
  * `setAll` is wrapped in try/catch because Server Components are not allowed
- * to write cookies — the proxy middleware handles token rotation, so it's
- * safe to ignore those write attempts here.
+ * to write cookies. We don't refresh tokens server-side — the browser client
+ * rotates them via onAuthStateChange. A stale-but-not-expired token here will
+ * silently fail; the client recovers on next mount.
  */
 export async function getServerClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
@@ -25,7 +26,7 @@ export async function getServerClient(): Promise<SupabaseClient> {
             cookieStore.set(name, value, options);
           }
         } catch {
-          // Server Component context — middleware refreshes tokens.
+          // Server Component context — cookies are read-only here.
         }
       },
     },

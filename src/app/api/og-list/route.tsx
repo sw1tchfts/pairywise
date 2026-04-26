@@ -1,14 +1,16 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { hasSupabaseEnv, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
 import type { ItemRow, ListRow } from '@/lib/cloud/mappers';
+import {
+  OGFrame,
+  OG_HEIGHT,
+  OG_PALETTE,
+  OG_WIDTH,
+  getOgSupabase,
+} from '../_og/frame';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const WIDTH = 1200;
-const HEIGHT = 630;
 
 /**
  * Public OG preview image for a shared list. Unlike /api/share-card,
@@ -19,17 +21,9 @@ const HEIGHT = 630;
 export async function GET(request: NextRequest) {
   const listId = request.nextUrl.searchParams.get('listId');
   if (!listId) return new Response('Missing listId', { status: 400 });
-  if (!hasSupabaseEnv()) return new Response('Not configured', { status: 500 });
 
-  // Explicitly no cookies — we want anon-role access.
-  const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {
-    cookies: {
-      getAll: () => [],
-      setAll: () => {
-        /* read-only */
-      },
-    },
-  });
+  // Anon-role: no cookies, RLS lets through non-private lists.
+  const supabase = await getOgSupabase(false);
 
   const { data: listRow } = await supabase
     .from('lists')
@@ -52,18 +46,7 @@ export async function GET(request: NextRequest) {
 
   return new ImageResponse(
     (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#0b0b0c',
-          color: '#fafafa',
-          padding: '64px 72px',
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-        }}
-      >
+      <OGFrame footerRight="Tap to join & vote →">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span
             style={{
@@ -71,7 +54,7 @@ export async function GET(request: NextRequest) {
               fontWeight: 700,
               letterSpacing: 0.8,
               textTransform: 'uppercase',
-              color: '#888',
+              color: OG_PALETTE.faint,
             }}
           >
             pairywise · you&apos;re invited
@@ -97,7 +80,7 @@ export async function GET(request: NextRequest) {
           style={{
             marginTop: 14,
             fontSize: 26,
-            color: '#aaa',
+            color: OG_PALETTE.muted,
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -124,8 +107,8 @@ export async function GET(request: NextRequest) {
                 style={{
                   fontSize: 22,
                   color: '#e5e5e5',
-                  background: '#1a1a1d',
-                  border: '1px solid #2a2a30',
+                  background: OG_PALETTE.surface,
+                  border: `1px solid ${OG_PALETTE.border}`,
                   borderRadius: 12,
                   padding: '8px 14px',
                   maxWidth: 360,
@@ -140,22 +123,8 @@ export async function GET(request: NextRequest) {
             ))}
           </div>
         )}
-
-        <div
-          style={{
-            marginTop: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            color: '#666',
-            fontSize: 22,
-          }}
-        >
-          <span>pairywise.com</span>
-          <span>Tap to join &amp; vote →</span>
-        </div>
-      </div>
+      </OGFrame>
     ),
-    { width: WIDTH, height: HEIGHT },
+    { width: OG_WIDTH, height: OG_HEIGHT },
   );
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import * as api from '@/lib/cloud/api';
 import { useToast } from '@/components/Toaster';
+import { errorMessage } from '@/lib/utils';
 
 export default function AdminUsersPage() {
   const toast = useToast();
@@ -15,7 +16,7 @@ export default function AdminUsersPage() {
       try {
         setUsers(await api.adminListUsers());
       } catch (err) {
-        toast.push(err instanceof Error ? err.message : 'Failed to load users', {
+        toast.push(errorMessage(err, 'Failed to load users'), {
           kind: 'error',
         });
         setUsers([]);

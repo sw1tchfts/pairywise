@@ -7,8 +7,6 @@ import { HeaderActions } from '@/components/HeaderActions';
 import { CloudHydrator } from '@/components/CloudHydrator';
 import { LocalListsMigration } from '@/components/LocalListsMigration';
 import { getServerClient } from '@/lib/supabase/server';
-import { fetchAllListsWith } from '@/lib/cloud/listFetch';
-import type { RankList } from '@/lib/types';
 import './globals.css';
 
 const themeScript = `
@@ -33,38 +31,27 @@ export const metadata: Metadata = {
 };
 
 /**
- * Pre-fetch the signed-in user + their lists on the server. Two reasons:
- *
- * 1. The home page hydrates with data already in the HTML — no
- *    "Loading your lists…" spinner, no client-side request waterfall.
- * 2. Reading cookies here automatically opts the layout out of Vercel's
- *    static cache. Without that, every visitor (signed in or not) was
- *    getting the same cached HTML shell — which is what made the home
- *    page look stuck for users whose client-side hydration hadn't fired.
- *
- * On any failure (Supabase down, transient network) we fall back to the
- * client-side hydrator inside <CloudHydrator>.
+ * Resolve the signed-in user on the server. Reading auth cookies here is
+ * what opts the layout out of Vercel's static cache (without it, every
+ * visitor got the same cached "Loading…" shell). The lists themselves are
+ * hydrated client-side by <CloudHydrator>; pre-fetching them here ran on
+ * every route — including admin/profile/signin where the data was never
+ * consumed.
  */
-async function loadInitialState(): Promise<{
-  userId: string | null;
-  lists: RankList[] | null;
-}> {
+async function loadCurrentUserId(): Promise<string | null> {
   try {
     const supabase = await getServerClient();
     const { data } = await supabase.auth.getUser();
-    const userId = data.user?.id ?? null;
-    if (!userId) return { userId: null, lists: null };
-    const lists = await fetchAllListsWith(supabase, userId);
-    return { userId, lists };
+    return data.user?.id ?? null;
   } catch {
-    return { userId: null, lists: null };
+    return null;
   }
 }
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const initial = await loadInitialState();
+  const initialUserId = await loadCurrentUserId();
   return (
     <html
       lang="en"
@@ -88,10 +75,7 @@ export default async function RootLayout({
             </div>
           </header>
           <main className="flex-1">
-            <CloudHydrator
-              initialUserId={initial.userId}
-              initialLists={initial.lists}
-            >
+            <CloudHydrator initialUserId={initialUserId}>
               {children}
             </CloudHydrator>
             <LocalListsMigration />

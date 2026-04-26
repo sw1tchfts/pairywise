@@ -7,6 +7,7 @@ import { useStore } from '@/lib/store';
 import { useToast } from '@/components/Toaster';
 import type { RankList } from '@/lib/types';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
+import { errorMessage } from '@/lib/utils';
 
 export default function ArchivedPage() {
   const toast = useToast();
@@ -23,7 +24,7 @@ export default function ArchivedPage() {
         if (cancelled) return;
         setLists(all.filter((l) => Boolean(l.archivedAt)));
       } catch (err) {
-        toast.push(err instanceof Error ? err.message : 'Failed to load.', {
+        toast.push(errorMessage(err, 'Failed to load.'), {
           kind: 'error',
         });
         if (!cancelled) setLists([]);
@@ -44,7 +45,7 @@ export default function ArchivedPage() {
       await hydrate();
       toast.push(`Restored "${l.title}"`, { kind: 'success' });
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : 'Restore failed.', {
+      toast.push(errorMessage(err, 'Restore failed.'), {
         kind: 'error',
       });
     } finally {
@@ -60,7 +61,7 @@ export default function ArchivedPage() {
       setLists((cur) => cur?.filter((x) => x.id !== l.id) ?? null);
       toast.push(`Deleted "${l.title}"`, { kind: 'info' });
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : 'Delete failed.', {
+      toast.push(errorMessage(err, 'Delete failed.'), {
         kind: 'error',
       });
     } finally {

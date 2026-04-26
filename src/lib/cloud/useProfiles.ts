@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { fetchProfiles, type Profile } from './api';
-import { isCloudEnabled } from '../supabase/browser';
 
 const cache = new Map<string, Profile>();
 const inflight = new Map<string, Promise<void>>();
@@ -42,7 +41,6 @@ export function useProfiles(userIds: string[]): Map<string, Profile> {
   const [, setTick] = useState(0);
 
   useEffect(() => {
-    if (!isCloudEnabled()) return;
     const l = () => setTick((n) => n + 1);
     listeners.add(l);
     ensureProfiles(userIds);

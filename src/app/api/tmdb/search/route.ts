@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { errorMessage } from '@/lib/utils';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ results: filtered });
   } catch (err) {
     return Response.json(
-      { error: err instanceof Error ? err.message : 'Fetch failed' },
+      { error: errorMessage(err, 'Fetch failed') },
       { status: 502 },
     );
   }

@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
 import { createServerClient } from '@supabase/ssr';
-import {
-  hasSupabaseEnv,
-  supabaseAnonKey,
-  supabaseUrl,
-} from '@/lib/supabase/env';
+import { supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
 import { SharedListClient } from './SharedListClient';
 
 type Params = { id: string };
@@ -25,7 +21,6 @@ export async function generateMetadata({
     title: 'Pairywise — shared list',
     description: 'You’ve been invited to rank a list on pairywise.',
   };
-  if (!hasSupabaseEnv()) return fallback;
 
   // Explicitly no cookies → anon role. RLS on lists allows SELECT when
   // visibility != 'private'.
@@ -44,6 +39,7 @@ export async function generateMetadata({
     .eq('id', id)
     .maybeSingle();
   if (!row || row.visibility === 'private') return fallback;
+
 
   const title = row.title as string;
   const description =

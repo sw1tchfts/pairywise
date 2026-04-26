@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ItemTypeSchema = z.enum([
+const ItemTypeSchema = z.enum([
   'text',
   'image',
   'url',
@@ -11,7 +11,7 @@ export const ItemTypeSchema = z.enum([
 ]);
 export type ItemType = z.infer<typeof ItemTypeSchema>;
 
-export const ItemSchema = z.object({
+const ItemSchema = z.object({
   id: z.string(),
   type: ItemTypeSchema.default('text'),
   title: z.string(),
@@ -27,7 +27,7 @@ export const ItemSchema = z.object({
 });
 export type Item = z.infer<typeof ItemSchema>;
 
-export const ComparisonSchema = z.object({
+const ComparisonSchema = z.object({
   id: z.string(),
   voterId: z.string().optional(),
   winnerId: z.string(),
@@ -39,11 +39,10 @@ export type Comparison = z.infer<typeof ComparisonSchema>;
 
 export type Algorithm = 'elo' | 'bradleyTerry';
 
-export const TierSchema = z.enum(['S', 'A', 'B', 'C', 'D']);
+const TierSchema = z.enum(['S', 'A', 'B', 'C', 'D']);
 export type Tier = z.infer<typeof TierSchema>;
-export const TIERS: Tier[] = ['S', 'A', 'B', 'C', 'D'];
 
-export const BracketMatchSchema = z.object({
+const BracketMatchSchema = z.object({
   id: z.string(),
   round: z.number(),
   aId: z.string().nullable(),
@@ -52,17 +51,17 @@ export const BracketMatchSchema = z.object({
 });
 export type BracketMatch = z.infer<typeof BracketMatchSchema>;
 
-export const BracketSchema = z.object({
+const BracketSchema = z.object({
   seed: z.array(z.string()),
   matches: z.array(BracketMatchSchema),
   championId: z.string().nullable().optional(),
 });
 export type Bracket = z.infer<typeof BracketSchema>;
 
-export const VisibilitySchema = z.enum(['private', 'unlisted', 'public']);
+const VisibilitySchema = z.enum(['private', 'unlisted', 'public']);
 export type Visibility = z.infer<typeof VisibilitySchema>;
 
-export const PhaseSchema = z.enum(['submission', 'voting']);
+const PhaseSchema = z.enum(['submission', 'voting']);
 export type Phase = z.infer<typeof PhaseSchema>;
 
 export const ListSchema = z.object({

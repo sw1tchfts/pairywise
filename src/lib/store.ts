@@ -9,7 +9,7 @@ import type {
   RankList,
   Visibility,
 } from './types';
-import { uid } from './utils';
+import { errorMessage, uid } from './utils';
 import * as api from './cloud/api';
 
 type State = {
@@ -23,7 +23,6 @@ type State = {
 
 type Actions = {
   hydrate: () => Promise<void>;
-  setHydratedFromServer: (lists: RankList[], userId: string) => void;
   reset: () => void;
   createList: (input: {
     title: string;
@@ -92,31 +91,10 @@ export const useStore = create<State & Actions>()((set, get) => ({
     } catch (err) {
       set({
         hydrating: false,
-        hydrateError: err instanceof Error ? err.message : 'Failed to load lists.',
+        hydrateError: errorMessage(err, 'Failed to load lists.'),
       });
       reportCloudError('hydrate', err);
     }
-  },
-
-  setHydratedFromServer: (lists, userId) => {
-    // Skip if the store was already hydrated locally (the user has done a
-    // mutation since mount). The server snapshot would clobber their
-    // optimistic state.
-    if (get().hydrated) return;
-    const map: Record<string, RankList> = {};
-    const order: string[] = [];
-    for (const l of lists) {
-      map[l.id] = l;
-      order.push(l.id);
-    }
-    set({
-      lists: map,
-      order,
-      hydrated: true,
-      hydrating: false,
-      hydrateError: null,
-      currentUserId: userId,
-    });
   },
 
   reset: () =>
@@ -249,7 +227,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
         },
       };
     });
-    api.updateListPhase(id, phase).catch((e) => reportCloudError('setPhase', e));
+    api.updateListFields(id, { phase }).catch((e) => reportCloudError('setPhase', e));
   },
 
   addItem: (listId, item) => {
