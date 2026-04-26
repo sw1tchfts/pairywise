@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -69,8 +70,13 @@ export function Toaster({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Stable context value so consumers using `useToast()` in effect deps
+  // don't re-fire every time a toast is added/removed (which used to cause
+  // error toasts to spam infinitely when the failing effect retried).
+  const value = useMemo<ToastContext>(() => ({ push }), [push]);
+
   return (
-    <Ctx.Provider value={{ push }}>
+    <Ctx.Provider value={value}>
       {children}
       <div
         aria-live="polite"
