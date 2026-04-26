@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { hasSupabaseEnv, supabaseAnonKey, supabaseUrl } from '@/lib/supabase/env';
+import { hasSupabaseEnv } from '@/lib/supabase/env';
 
 // Signed-in users are redirected away from these (back to /).
 const SIGNED_IN_DISALLOWED = ['/signin', '/signup'];
@@ -11,32 +10,30 @@ function matches(pathname: string, prefixes: string[]) {
   return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export async function proxy(request: NextRequest) {
+/**
+ * Lightweight auth check: does the browser have a Supabase auth-token cookie
+ * for *some* project? Cookie names are of the form
+ * `sb-<project-ref>-auth-token` (or `.0`, `.1` for chunked sessions).
+ *
+ * We intentionally do NOT call `supabase.auth.getUser()` here — that would
+ * round-trip to Supabase on every navigation (200–500ms tax per click).
+ * Server Components and route handlers re-validate the JWT through their
+ * own server client, and Supabase RLS protects the data on the wire, so
+ * a cookie-presence gate is the right level of trust at the edge.
+ */
+function hasAuthCookie(request: NextRequest): boolean {
+  for (const c of request.cookies.getAll()) {
+    if (c.name.startsWith('sb-') && c.name.includes('auth-token')) return true;
+  }
+  return false;
+}
+
+export function proxy(request: NextRequest) {
   if (!hasSupabaseEnv()) {
     return NextResponse.next({ request });
   }
 
-  let response = NextResponse.next({ request });
-
-  const supabase = createServerClient(supabaseUrl(), supabaseAnonKey(), {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        for (const { name, value } of cookiesToSet) {
-          request.cookies.set(name, value);
-        }
-        response = NextResponse.next({ request });
-        for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const { data } = await supabase.auth.getUser();
-  const signedIn = Boolean(data.user);
+  const signedIn = hasAuthCookie(request);
   const { pathname } = request.nextUrl;
 
   // Signed-in users visiting /signin or /signup go home. (/shared is NOT in
@@ -57,19 +54,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return response;
+  return NextResponse.next({ request });
 }
 
 export const config = {
   matcher: [
     // Match everything except static assets, OG routes, and TMDB search, AND
-    // skip Next.js prefetch requests. Without the `missing` clause, every
-    // <Link> in the viewport triggers a prefetch that runs this middleware,
-    // each of which calls supabase.auth.getUser() — on Vercel's Edge runtime
-    // the resulting fan-out blows the per-worker DNS cache and returns 503
-    // "DNS cache overflow". The auth check on the actual navigation still
-    // runs; we just don't run it on speculative prefetches.
-    // /api/og-list is excluded so link unfurlers can fetch unauthenticated.
+    // skip Next.js prefetch requests so we don't fan-out auth checks for
+    // every speculative <Link> in the viewport. /api/og-list is excluded so
+    // link unfurlers can fetch unauthenticated.
     {
       source:
         '/((?!_next/static|_next/image|favicon\\.ico|icon\\.svg|manifest\\.webmanifest|api/og|api/og-list|api/tmdb).*)',

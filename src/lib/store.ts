@@ -23,6 +23,7 @@ type State = {
 
 type Actions = {
   hydrate: () => Promise<void>;
+  setHydratedFromServer: (lists: RankList[], userId: string) => void;
   reset: () => void;
   createList: (input: {
     title: string;
@@ -95,6 +96,27 @@ export const useStore = create<State & Actions>()((set, get) => ({
       });
       reportCloudError('hydrate', err);
     }
+  },
+
+  setHydratedFromServer: (lists, userId) => {
+    // Skip if the store was already hydrated locally (the user has done a
+    // mutation since mount). The server snapshot would clobber their
+    // optimistic state.
+    if (get().hydrated) return;
+    const map: Record<string, RankList> = {};
+    const order: string[] = [];
+    for (const l of lists) {
+      map[l.id] = l;
+      order.push(l.id);
+    }
+    set({
+      lists: map,
+      order,
+      hydrated: true,
+      hydrating: false,
+      hydrateError: null,
+      currentUserId: userId,
+    });
   },
 
   reset: () =>
