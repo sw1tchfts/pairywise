@@ -9,7 +9,7 @@ import type {
   RankList,
   Visibility,
 } from './types';
-import { uid } from './utils';
+import { errorMessage, uid } from './utils';
 import * as api from './cloud/api';
 
 type State = {
@@ -92,7 +92,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
     } catch (err) {
       set({
         hydrating: false,
-        hydrateError: err instanceof Error ? err.message : 'Failed to load lists.',
+        hydrateError: errorMessage(err, 'Failed to load lists.'),
       });
       reportCloudError('hydrate', err);
     }

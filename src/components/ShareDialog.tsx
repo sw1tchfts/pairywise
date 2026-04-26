@@ -9,6 +9,7 @@ import * as api from '@/lib/cloud/api';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
+import { errorMessage } from '@/lib/utils';
 
 const VISIBILITY_LABEL: Record<Visibility, string> = {
   private: 'Private · only you',
@@ -59,7 +60,7 @@ export function ShareDialog({
       const rows = await api.fetchListMembers(listId);
       setMembers(rows);
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : 'Failed to load members.', {
+      toast.push(errorMessage(err, 'Failed to load members.'), {
         kind: 'error',
       });
     } finally {
@@ -122,7 +123,7 @@ export function ShareDialog({
         router.push('/');
       }
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : 'Remove failed.', {
+      toast.push(errorMessage(err, 'Remove failed.'), {
         kind: 'error',
       });
     } finally {

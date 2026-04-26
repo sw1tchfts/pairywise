@@ -5,6 +5,7 @@ import Link from 'next/link';
 import * as api from '@/lib/cloud/api';
 import { useToast } from '@/components/Toaster';
 import { invalidateProfile } from '@/lib/cloud/useProfiles';
+import { errorMessage } from '@/lib/utils';
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -56,7 +57,7 @@ export default function AdminUserEditPage({
         setIsAdmin(u.isAdmin);
       } catch (err) {
         if (cancelled) return;
-        toast.push(err instanceof Error ? err.message : 'Failed to load user', {
+        toast.push(errorMessage(err, 'Failed to load user'), {
           kind: 'error',
         });
       } finally {
@@ -115,7 +116,7 @@ export default function AdminUserEditPage({
         isAdmin,
       });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Save failed';
+      const msg = errorMessage(err, 'Save failed');
       setError(/duplicate key/.test(msg) ? 'That handle is taken.' : msg);
     } finally {
       setSaving(false);
@@ -129,7 +130,7 @@ export default function AdminUserEditPage({
       toast.push('Removed from list', { kind: 'success' });
       await reloadAccess();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : 'Remove failed', {
+      toast.push(errorMessage(err, 'Remove failed'), {
         kind: 'error',
       });
     }
@@ -143,7 +144,7 @@ export default function AdminUserEditPage({
       toast.push('Added to list', { kind: 'success' });
       await reloadAccess();
     } catch (err) {
-      toast.push(err instanceof Error ? err.message : 'Add failed', {
+      toast.push(errorMessage(err, 'Add failed'), {
         kind: 'error',
       });
     } finally {

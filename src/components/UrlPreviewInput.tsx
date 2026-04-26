@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Item } from '@/lib/types';
+import { errorMessage } from '@/lib/utils';
 
 type Props = {
   onImport: (patch: Partial<Omit<Item, 'id'>>) => void;
@@ -31,7 +32,7 @@ export function UrlPreviewInput({ onImport }: Props) {
       const data = (await res.json()) as Preview;
       setPreview(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch preview');
+      setError(errorMessage(err, 'Failed to fetch preview'));
     } finally {
       setLoading(false);
     }

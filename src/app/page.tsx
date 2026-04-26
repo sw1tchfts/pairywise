@@ -10,6 +10,7 @@ import { summarize, timeAgo } from '@/lib/listSummary';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { OverflowMenu, type OverflowAction } from '@/components/OverflowMenu';
 import type { RankList } from '@/lib/types';
+import { errorMessage } from '@/lib/utils';
 
 type SortKey = 'recent' | 'votes' | 'alpha';
 type OwnerFilter = 'all' | 'mine' | 'shared';
@@ -38,10 +39,7 @@ export default function HomePage() {
       toast.push(`Imported "${parsed.title}"`, { kind: 'success' });
       return newId;
     } catch (err) {
-      toast.push(
-        err instanceof Error ? err.message : 'Could not import file.',
-        { kind: 'error' },
-      );
+      toast.push(errorMessage(err, 'Could not import file.'), { kind: 'error' });
       return null;
     }
   }

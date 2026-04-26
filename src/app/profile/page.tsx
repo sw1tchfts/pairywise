@@ -6,6 +6,7 @@ import * as api from '@/lib/cloud/api';
 import { useToast } from '@/components/Toaster';
 import { invalidateProfile } from '@/lib/cloud/useProfiles';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { errorMessage } from '@/lib/utils';
 
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 
@@ -49,7 +50,7 @@ export default function ProfilePage() {
       if (userId) invalidateProfile(userId);
       toast.push('Profile saved', { kind: 'success' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Save failed.';
+      const msg = errorMessage(err, 'Save failed.');
       setError(
         /duplicate key/.test(msg)
           ? 'That handle is taken. Pick another.'

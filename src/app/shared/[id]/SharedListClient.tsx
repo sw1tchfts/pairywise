@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as api from '@/lib/cloud/api';
 import { useStore } from '@/lib/store';
+import { errorMessage } from '@/lib/utils';
 
 export function SharedListClient({ id }: { id: string }) {
   const router = useRouter();
@@ -47,7 +48,7 @@ export function SharedListClient({ id }: { id: string }) {
         if (cancelled) return;
         setState({
           kind: 'error',
-          message: err instanceof Error ? err.message : 'Something went wrong.',
+          message: errorMessage(err, 'Something went wrong.'),
         });
       }
     })();

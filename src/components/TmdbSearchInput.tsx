@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Item } from '@/lib/types';
+import { errorMessage } from '@/lib/utils';
 
 type Props = {
   onImport: (patch: Partial<Omit<Item, 'id'>>) => void;
@@ -38,7 +39,7 @@ export function TmdbSearchInput({ onImport }: Props) {
       const data = (await res.json()) as { results: TmdbResult[] };
       setResults(data.results ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
+      setError(errorMessage(err, 'Search failed'));
     } finally {
       setLoading(false);
     }
