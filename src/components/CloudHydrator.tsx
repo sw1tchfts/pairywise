@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { getBrowserClient, isCloudEnabled } from '@/lib/supabase/browser';
+import type { RankList } from '@/lib/types';
 
 const PUBLIC_PATHS = ['/signin', '/signup'];
 
@@ -11,28 +12,63 @@ function isPublicPath(path: string) {
   return PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 }
 
-export function CloudHydrator({ children }: { children: React.ReactNode }) {
+type Props = {
+  children: React.ReactNode;
+  /** Lists pre-fetched on the server. Null means we couldn't fetch (signed
+   *  out, or the server fetch errored) — in that case we fall back to the
+   *  client-side hydrate. */
+  initialLists: RankList[] | null;
+  /** User id pre-fetched on the server. Null means signed out. */
+  initialUserId: string | null;
+};
+
+export function CloudHydrator({
+  children,
+  initialLists,
+  initialUserId,
+}: Props) {
+  const setHydratedFromServer = useStore((s) => s.setHydratedFromServer);
   const hydrate = useStore((s) => s.hydrate);
   const reset = useStore((s) => s.reset);
   const hydrated = useStore((s) => s.hydrated);
   const hydrateError = useStore((s) => s.hydrateError);
   const pathname = usePathname();
-  const [signedIn, setSignedIn] = useState<boolean | null>(() =>
-    isCloudEnabled() ? null : false,
-  );
+  const cloud = isCloudEnabled();
+
+  // If the server resolved a user, trust that as the initial signed-in
+  // state. Avoids an SSR/client mismatch flash when the page renders.
+  const [signedIn, setSignedIn] = useState<boolean | null>(() => {
+    if (!cloud) return false;
+    if (initialUserId) return true;
+    return null;
+  });
+
+  // Seed the store synchronously on first render when the server pre-fetched
+  // data. Done in a ref-guarded effect-equivalent so it only fires once.
+  const seeded = useRef(false);
+  if (!seeded.current && initialLists && initialUserId) {
+    setHydratedFromServer(initialLists, initialUserId);
+    seeded.current = true;
+  }
 
   useEffect(() => {
-    if (!isCloudEnabled()) return;
+    if (!cloud) return;
     const supabase = getBrowserClient();
     let mounted = true;
 
-    (async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!mounted) return;
-      const hasUser = Boolean(data.user);
-      setSignedIn(hasUser);
-      if (hasUser) hydrate();
-    })();
+    // If the server already populated the store, we don't need a second
+    // round-trip on mount — just confirm auth state and listen for changes.
+    const alreadyHydrated = Boolean(initialLists && initialUserId);
+
+    if (!alreadyHydrated) {
+      (async () => {
+        const { data } = await supabase.auth.getUser();
+        if (!mounted) return;
+        const hasUser = Boolean(data.user);
+        setSignedIn(hasUser);
+        if (hasUser) hydrate();
+      })();
+    }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
@@ -48,12 +84,10 @@ export function CloudHydrator({ children }: { children: React.ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [hydrate, reset]);
+  }, [cloud, hydrate, reset, initialLists, initialUserId, setHydratedFromServer]);
 
-  // Public auth pages always render — they don't need hydrated data.
   if (isPublicPath(pathname)) return <>{children}</>;
 
-  // While we're still figuring out auth status, show a small loader.
   if (signedIn === null) {
     return (
       <div className="min-h-[40vh] grid place-items-center text-sm text-foreground/50">
@@ -62,8 +96,6 @@ export function CloudHydrator({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Signed out but on a protected route — the proxy will redirect, but in the
-  // brief window before that happens we render nothing rather than stale data.
   if (!signedIn) return null;
 
   if (hydrateError) {
