@@ -7,7 +7,7 @@ import { TmdbSearchInput } from './TmdbSearchInput';
 import { TagInput } from './TagInput';
 import { VoteCard } from './VoteCard';
 import { AudioUploadEditor } from './AudioUploadEditor';
-import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
+import { Modal } from './Modal';
 
 type Props = {
   open: boolean;
@@ -33,10 +33,16 @@ const EMPTY: Omit<Item, 'id'> = {
   linkUrl: '',
 };
 
-export function ItemEditor({ open, ...rest }: Props) {
-  useBodyScrollLock(open);
-  if (!open) return null;
-  return <ItemEditorForm {...rest} />;
+export function ItemEditor({ open, onClose, ...rest }: Props) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      backdropClassName="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+    >
+      <ItemEditorForm onClose={onClose} {...rest} />
+    </Modal>
+  );
 }
 
 function normalizeTitle(s: string) {
@@ -106,12 +112,7 @@ function ItemEditorForm({
 
   useEffect(() => {
     titleRef.current?.focus();
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, []);
 
   function commit() {
     onSave({
@@ -150,16 +151,7 @@ function ItemEditorForm({
   ].filter((v) => v?.trim()).length;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-background w-full max-w-lg rounded-t-xl sm:rounded-lg shadow-xl border border-black/10 dark:border-white/10 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="bg-background w-full max-w-lg rounded-t-xl sm:rounded-lg shadow-xl border border-black/10 dark:border-white/10 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">
@@ -366,7 +358,6 @@ function ItemEditorForm({
             </button>
           </div>
         </form>
-      </div>
     </div>
   );
 }

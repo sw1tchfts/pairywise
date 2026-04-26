@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from './Toaster';
 import { TagInput } from './TagInput';
-import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
+import { Modal } from './Modal';
 
 export function EditDetailsDialog({
   listId,
@@ -22,8 +22,6 @@ export function EditDetailsDialog({
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
-  useBodyScrollLock(open);
-
   useEffect(() => {
     if (!open || !list) return;
     queueMicrotask(() => {
@@ -32,15 +30,6 @@ export function EditDetailsDialog({
       setTags(list.tags);
     });
   }, [open, list]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
 
   if (!open || !list) return null;
 
@@ -58,15 +47,7 @@ export function EditDetailsDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-details-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <Modal open={open} onClose={onClose} labelledBy="edit-details-title">
       <form
         onSubmit={save}
         className="w-full max-w-md rounded-lg bg-background border border-foreground/10 shadow-xl p-5 space-y-4"
@@ -126,6 +107,6 @@ export function EditDetailsDialog({
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { RankList } from '@/lib/types';
 import { rankElo } from '@/lib/ranking';
-import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
+import { Modal } from './Modal';
 
 type Props = {
   list: RankList;
@@ -21,17 +21,6 @@ type OpponentRow = {
 };
 
 export function HeadToHeadDialog({ list, itemId, onClose }: Props) {
-  useBodyScrollLock(itemId !== null);
-
-  useEffect(() => {
-    if (!itemId) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [itemId, onClose]);
-
   const item = useMemo(
     () => (itemId ? list.items.find((i) => i.id === itemId) ?? null : null),
     [itemId, list.items],
@@ -104,15 +93,7 @@ export function HeadToHeadDialog({ list, itemId, onClose }: Props) {
   const totalLosses = rows.reduce((s, r) => s + r.losses, 0);
 
   return (
-    <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="h2h-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <Modal open={itemId !== null} onClose={onClose} labelledBy="h2h-title">
       <div className="w-full max-w-lg max-h-[85vh] overflow-auto rounded-lg bg-background border border-foreground/10 shadow-xl">
         <div className="sticky top-0 bg-background border-b border-foreground/10 p-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -184,6 +165,6 @@ export function HeadToHeadDialog({ list, itemId, onClose }: Props) {
           </ul>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

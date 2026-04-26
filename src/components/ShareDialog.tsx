@@ -8,8 +8,8 @@ import type { Visibility } from '@/lib/types';
 import * as api from '@/lib/cloud/api';
 import { profileLabel, useProfiles } from '@/lib/cloud/useProfiles';
 import { useCurrentUserId } from '@/lib/supabase/useCurrentUser';
-import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { errorMessage } from '@/lib/utils';
+import { Modal } from './Modal';
 
 const VISIBILITY_LABEL: Record<Visibility, string> = {
   private: 'Private · only you',
@@ -68,19 +68,12 @@ export function ShareDialog({
     }
   }, [listId, toast]);
 
-  useBodyScrollLock(open);
-
   useEffect(() => {
     if (!open) return;
     queueMicrotask(() => {
       refreshMembers();
     });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose, refreshMembers]);
+  }, [open, refreshMembers]);
 
   if (!open || !list) return null;
 
@@ -135,15 +128,7 @@ export function ShareDialog({
   const ownerId = list.ownerId ?? currentUserId ?? null;
 
   return (
-    <div
-      className="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="share-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    <Modal open={open} onClose={onClose} labelledBy="share-title">
       <div className="w-full max-w-md max-h-[90vh] overflow-auto rounded-lg bg-background border border-foreground/10 shadow-xl">
         <div className="sticky top-0 bg-background border-b border-foreground/10 p-5 flex items-start justify-between">
           <div>
@@ -251,7 +236,7 @@ export function ShareDialog({
           </ul>
         </section>
       </div>
-    </div>
+    </Modal>
   );
 }
 
